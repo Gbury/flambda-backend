@@ -113,8 +113,8 @@ let run ~symbol_for_global ~get_global_info ~round unit =
       (Exported_code.mark_as_imported !imported_code)
   in
   let name_occurrences = UA.name_occurrences uacc in
-  let used_closure_ids = Name_occurrences.closure_ids name_occurrences in
-  let used_closure_vars = Name_occurrences.closure_vars name_occurrences in
+  let used_closure_ids = Name_occurrences.normal_closure_ids name_occurrences in
+  let used_closure_vars = Name_occurrences.normal_closure_vars name_occurrences in
   let () =
     match Sys.getenv "DEBUG" with
     | exception Not_found -> ()

@@ -758,10 +758,9 @@ let print = Greedy.print
 let create () = Greedy.create_initial_state ()
 
 let add_set_of_closures state ~is_phantom ~all_code set_of_closures =
-  (* if the definition is a phantom one, there is no need to attribute a slot.
+  (* if the definition is a phantom one, there is no need to attribute offsets.
      Also a phantom declaration can refer to a dead code_id. *)
-  if is_phantom
-  then state
+  if is_phantom then state
   else Greedy.create_slots_for_set state all_code set_of_closures
 
 let finalize_offsets ~used_closure_vars ~used_closure_ids state =
