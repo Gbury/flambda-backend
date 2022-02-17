@@ -450,7 +450,9 @@ let simplify_direct_partial_application ~simplify_expr dacc apply
         ~name:(Closure_id.to_string callee's_closure_id ^ "_partial")
         (Compilation_unit.get_current_exn ())
     in
-    let result_types = Result_types.create_unknown ~params:remaining_params ~result_arity in
+    let result_types =
+      Result_types.create_unknown ~params:remaining_params ~result_arity
+    in
     let code : Static_const_or_code.t =
       let code =
         Code.create code_id ~params_and_body
