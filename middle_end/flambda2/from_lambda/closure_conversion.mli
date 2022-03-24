@@ -61,8 +61,7 @@ val close_apply_cont :
   IR.simple list ->
   Expr_with_acc.t
 
-val close_switch :
-  Acc.t -> Env.t -> Ident.t -> IR.switch -> Expr_with_acc.t
+val close_switch : Acc.t -> Env.t -> Ident.t -> IR.switch -> Expr_with_acc.t
 
 val close_program :
   symbol_for_global:(?comp_unit:Compilation_unit.t -> Ident.t -> Symbol.t) ->

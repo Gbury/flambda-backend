@@ -635,10 +635,9 @@ let rec_catch_for_for_loop env ident start stop (dir : Asttypes.direction_flag)
 
 let let_cont_nonrecursive_with_extra_params acc env ccenv ~is_exn_handler
     ~params
-    ~(body :
-       Acc.t -> Env.t -> CCenv.t -> Continuation.t -> Expr_with_acc.t)
-    ~(handler : Acc.t -> Env.t -> CCenv.t -> Expr_with_acc.t) :
-    Expr_with_acc.t =
+    ~(body : Acc.t -> Env.t -> CCenv.t -> Continuation.t -> Expr_with_acc.t)
+    ~(handler : Acc.t -> Env.t -> CCenv.t -> Expr_with_acc.t) : Expr_with_acc.t
+    =
   let cont = Continuation.create () in
   let { Env.body_env; handler_env; extra_params } =
     Env.add_continuation env cont ~push_to_try_stack:is_exn_handler Nonrecursive
@@ -1757,7 +1756,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~scrutinee
       switch_expr acc ccenv)
     k_exn
 
-(* CR pchambart: define a record `target_config` to hold things like `big_endian` *)
+(* CR pchambart: define a record `target_config` to hold things like
+   `big_endian` *)
 let lambda_to_flambda ~symbol_for_global ~big_endian ~cmx_loader ~module_ident
     ~module_block_size_in_words (lam : Lambda.lambda) :
     Flambda_unit.t
@@ -1778,4 +1778,3 @@ let lambda_to_flambda ~symbol_for_global ~big_endian ~cmx_loader ~module_ident
   CC.close_program ~symbol_for_global ~big_endian ~cmx_loader ~module_ident
     ~module_block_size_in_words ~program:toplevel
     ~prog_return_cont:return_continuation ~exn_continuation
-

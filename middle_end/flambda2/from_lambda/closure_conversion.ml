@@ -648,8 +648,7 @@ let close_trap_action_opt trap_action =
     trap_action
 
 let close_named acc env ~let_bound_var (named : IR.named)
-    (k : Acc.t -> Named.t option -> Expr_with_acc.t) :
-    Expr_with_acc.t =
+    (k : Acc.t -> Named.t option -> Expr_with_acc.t) : Expr_with_acc.t =
   match named with
   | Simple (Var id) ->
     let acc, simple =
@@ -781,8 +780,7 @@ let close_let acc env id user_visible defining_expr
 let close_let_cont acc env ~name ~is_exn_handler ~params
     ~(recursive : Asttypes.rec_flag)
     ~(handler : Acc.t -> Env.t -> Expr_with_acc.t)
-    ~(body : Acc.t -> Env.t -> Expr_with_acc.t) :
-    Expr_with_acc.t =
+    ~(body : Acc.t -> Env.t -> Expr_with_acc.t) : Expr_with_acc.t =
   (if is_exn_handler
   then
     match recursive with
