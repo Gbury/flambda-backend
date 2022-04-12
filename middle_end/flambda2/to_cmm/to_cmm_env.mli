@@ -13,6 +13,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Inlining decision of bound expressions *)
+type inline =
+  | Do_not_inline
+  | Inline_once
+  | Duplicate
+      (** Akin to systematic substitutions, it should not be used for
+          (co)effectful expressions *)
+
 (** {1 Translation environment} *)
 
 (** Environment for Flambda to Cmm translation *)
@@ -128,10 +136,10 @@ val bind_variable :
   ?extra:extra_info ->
   t ->
   Variable.t ->
-  num_normal_occurrences_of_bound_vars:
-    Num_occurrences.t Variable.Map.t Or_unknown.t ->
-  effects_and_coeffects_of_defining_expr:Effects_and_coeffects.t ->
-  defining_expr:Cmm.expression ->
+  ?extra:extra_info ->
+  Effects_and_coeffects.t ->
+  inline ->
+  Cmm.expression ->
   t
 
 (** Try and inline an Flambda variable using the delayed let-bindings. *)

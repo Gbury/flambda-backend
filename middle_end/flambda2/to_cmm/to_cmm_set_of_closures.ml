@@ -390,15 +390,20 @@ let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr =
   (* Update the result with the new static data *)
   let res = R.archive_data (R.set_data res static_data) in
   (* Bind the variables to the symbols for function slots. *)
-  (* CR-someday gbury: inline the variables (requires extending To_cmm_env to
-     inline pure variables more than once). *)
   let env =
     List.fold_left2
       (fun acc cid v ->
         let v = Bound_var.var v in
         let sym = C.symbol ~dbg (Function_slot.Map.find cid closure_symbols) in
+(*
+<<<<<<< HEAD
         Env.bind_variable acc v ~effects_and_coeffects_of_defining_expr:Ece.pure
           ~num_normal_occurrences_of_bound_vars:Unknown ~defining_expr:sym)
+=======
+        Env.bind_variable acc v Ece.pure Env.Duplicate sym)
+>>>>>>> 7fad2f373 (case for duplicated expression inlining)
+*)
+        assert false)
       env cids bound_vars
   in
   translate_expr env res body
@@ -431,10 +436,17 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
     C.make_alloc ~mode:(Alloc_mode.to_lambda closure_alloc_mode) dbg tag l
   in
   let soc_var = Variable.create "*set_of_closures*" in
+  let env = assert false in
+(*
+<<<<<<< HEAD
   let env =
     Env.bind_variable env soc_var ~effects_and_coeffects_of_defining_expr:effs
       ~num_normal_occurrences_of_bound_vars:Unknown ~defining_expr:csoc
   in
+=======
+  let env = Env.bind_variable env soc_var effs Env.Do_not_inline csoc in
+>>>>>>> 7fad2f373 (case for duplicated expression inlining)
+*)
   (* Get from the env the cmm variable that was created and bound to the
      compiled set of closures. *)
   let soc_cmm_var, env, peff = Env.inline_variable env soc_var in

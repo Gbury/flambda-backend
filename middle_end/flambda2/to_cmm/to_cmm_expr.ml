@@ -147,6 +147,24 @@ let match_var_with_extra_info env simple : Env.extra_info option =
         ~symbol:(fun _ -> None)
         ~var:(fun var -> Env.extra_info env var))
 
+(*
+(* Helpers for the translation of [Let] expressions *)
+
+let let_expr_bind ?extra env v ~num_normal_occurrences_of_bound_vars cmm_expr
+    ~effects_and_coeffects_of_defining_expr =
+  match
+    To_cmm_effects.classify_let_expr v ~effects_and_coeffects_of_defining_expr
+      ~num_normal_occurrences_of_bound_vars
+  with
+  | Drop_defining_expr -> env
+  | Inline ->
+    Env.bind_variable env v ?extra effects_and_coeffects_of_defining_expr Env.Inline_once
+      cmm_expr
+  | Regular ->
+    Env.bind_variable env v ?extra effects_and_coeffects_of_defining_expr Env.Do_not_inline
+      cmm_expr
+*)
+
 (* Helper for the translation of [Simple]s. *)
 
 let bind_simple ~dbg env v ~num_normal_occurrences_of_bound_vars s =
