@@ -157,8 +157,11 @@ let let_expr_bind ?extra env v ~num_normal_occurrences_of_bound_vars cmm_expr
       ~num_normal_occurrences_of_bound_vars
   with
   | Drop_defining_expr -> env
-  | Inline ->
+  | Inline_once ->
     Env.bind_variable env v ?extra effects_and_coeffects_of_defining_expr Env.Inline_once
+      cmm_expr
+  | Duplicate ->
+    Env.bind_variable env v ?extra effects_and_coeffects_of_defining_expr Env.Duplicate
       cmm_expr
   | Regular ->
     Env.bind_variable env v ?extra effects_and_coeffects_of_defining_expr Env.Do_not_inline
