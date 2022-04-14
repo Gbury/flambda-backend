@@ -395,15 +395,7 @@ let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr =
       (fun acc cid v ->
         let v = Bound_var.var v in
         let sym = C.symbol ~dbg (Function_slot.Map.find cid closure_symbols) in
-(*
-<<<<<<< HEAD
-        Env.bind_variable acc v ~effects_and_coeffects_of_defining_expr:Ece.pure
-          ~num_normal_occurrences_of_bound_vars:Unknown ~defining_expr:sym)
-=======
-        Env.bind_variable acc v Ece.pure Env.Duplicate sym)
->>>>>>> 7fad2f373 (case for duplicated expression inlining)
-*)
-        assert false)
+        Env.bind_variable acc v Ece.pure_duplicatable Env.Duplicate sym)
       env cids bound_vars
   in
   translate_expr env res body
@@ -417,9 +409,10 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
   let dbg = debuginfo_for_set_of_closures env set in
   let effs : Ece.t =
     ( Only_generative_effects Immutable,
-      match closure_alloc_mode with
+      (match closure_alloc_mode with
       | Heap -> No_coeffects
-      | Local -> Has_coeffects )
+      | Local -> Has_coeffects),
+      Duplicatable )
   in
   let decl_map =
     decls |> Function_slot.Lmap.bindings |> Function_slot.Map.of_list
@@ -436,17 +429,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
     C.make_alloc ~mode:(Alloc_mode.to_lambda closure_alloc_mode) dbg tag l
   in
   let soc_var = Variable.create "*set_of_closures*" in
-  let env = assert false in
-(*
-<<<<<<< HEAD
-  let env =
-    Env.bind_variable env soc_var ~effects_and_coeffects_of_defining_expr:effs
-      ~num_normal_occurrences_of_bound_vars:Unknown ~defining_expr:csoc
-  in
-=======
   let env = Env.bind_variable env soc_var effs Env.Do_not_inline csoc in
->>>>>>> 7fad2f373 (case for duplicated expression inlining)
-*)
   (* Get from the env the cmm variable that was created and bound to the
      compiled set of closures. *)
   let soc_cmm_var, env, peff = Env.inline_variable env soc_var in

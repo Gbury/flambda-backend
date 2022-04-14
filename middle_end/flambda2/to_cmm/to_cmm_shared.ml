@@ -71,7 +71,7 @@ let name env name =
     ~var:(fun v -> To_cmm_env.inline_variable env v)
     ~symbol:(fun s ->
       (* CR mshinwell: fix debuginfo? *)
-      symbol ~dbg:Debuginfo.none s, env, Ece.pure)
+      symbol ~dbg:Debuginfo.none s, env, Ece.pure_duplicatable)
 
 let const ~dbg cst =
   match Reg_width_const.descr cst with
@@ -86,7 +86,7 @@ let const ~dbg cst =
 let simple ~dbg env s =
   Simple.pattern_match s
     ~name:(fun n ~coercion:_ -> name env n)
-    ~const:(fun c -> const ~dbg c, env, Ece.pure)
+    ~const:(fun c -> const ~dbg c, env, Ece.pure_duplicatable)
 
 let name_static name =
   Name.pattern_match name
@@ -120,7 +120,7 @@ let simple_list ~dbg env l =
     let y, env, eff = simple ~dbg env x in
     y :: list, env, Ece.join eff effs
   in
-  let args, env, effs = List.fold_left aux ([], env, Ece.pure) l in
+  let args, env, effs = List.fold_left aux ([], env, Ece.pure_duplicatable) l in
   List.rev args, env, effs
 
 let bound_parameters env l =

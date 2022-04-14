@@ -312,7 +312,7 @@ let bind_variable ?extra env v
 let will_inline env binding = binding.cmm_expr, env, binding.effs
 
 let will_not_inline env binding =
-  C.var (Backend_var.With_provenance.var binding.cmm_var), env, Ece.pure
+  C.var (Backend_var.With_provenance.var binding.cmm_var), env, Ece.pure_duplicatable
 
 let will_not_inline_var env v =
   (* This is like [will_not_inline] but is used in the case where no delayed
@@ -320,7 +320,7 @@ let will_not_inline_var env v =
   match Variable.Map.find v env.vars with
   | exception Not_found ->
     Misc.fatal_errorf "Variable %a not found in env" Variable.print v
-  | e -> e, env, Ece.pure
+  | e -> e, env, Ece.pure_duplicatable
 
 let inline_variable env var =
   match Variable.Map.find var env.pures with

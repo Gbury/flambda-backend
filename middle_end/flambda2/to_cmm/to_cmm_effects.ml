@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@ocaml.warning "+a-4-30-40-41-42"]
+[@@@ocaml.warning "+a-30-40-41-42"]
 
 open! Flambda.Import
 
@@ -25,11 +25,11 @@ type effects_and_coeffects_classification =
 let classify_by_effects_and_coeffects effs =
   (* See the comments on type [classification] in the .mli. *)
   match (effs : Effects_and_coeffects.t) with
-  | Arbitrary_effects, (Has_coeffects | No_coeffects)
-  | Only_generative_effects _, (Has_coeffects | No_coeffects) ->
+  | Arbitrary_effects, (Has_coeffects | No_coeffects), _
+  | Only_generative_effects _, (Has_coeffects | No_coeffects), _ ->
     Effect
-  | No_effects, Has_coeffects -> Coeffect_only
-  | No_effects, No_coeffects -> Pure
+  | No_effects, Has_coeffects, _ -> Coeffect_only
+  | No_effects, No_coeffects, _ -> Pure
 
 type let_binding_classification =
   | Regular
@@ -76,17 +76,17 @@ let classify_let_binding var
        Deep expressions involving arbitrary effects are less common, so inlining
        for these expressions is controlled by the global [inline_effects_in_cmm]
        setting. *)
-    | Only_generative_effects _, _ -> May_inline_once
-    | Arbitrary_effects, _ ->
+    | Only_generative_effects _, _, _ -> May_inline_once
+    | Arbitrary_effects, _, _ ->
       if Flambda_features.Expert.inline_effects_in_cmm ()
       then May_inline_once
       else Regular
-    | No_effects, _ -> May_inline_once
+    | No_effects, _, _ -> Inline_once
   end
   | More_than_one -> begin
     match effects_and_coeffects_of_defining_expr with
-    | No_effects, No_coeffects -> Inline_and_duplicate (* TODO: fix *)
-    | _, _ -> Regular
+    | _, _, Duplicatable -> Inline_and_duplicate (* TODO: fix *)
+    | _, _, _ -> Regular
   end
 
 type continuation_handler_classification =
