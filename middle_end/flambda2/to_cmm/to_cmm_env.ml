@@ -109,6 +109,26 @@ let return_continuation env = env.return_continuation
 
 let exn_continuation env = env.exn_continuation
 
+let [@ocamlformat "disable"] print_inline ppf = function
+  | Do_not_inline -> Format.fprintf ppf "do_not_inline"
+  | Inline_once -> Format.fprintf ppf "inline_once"
+  | Duplicate -> Format.fprintf ppf "duplicate"
+
+let [@ocamlformat "disable"] print_binding ppf
+    { order; inline; effs; cmm_var; cmm_expr; } =
+  Format.fprintf ppf "@[<hov 1>(\
+      @[<hov 1>(order@ %d)@]@ \
+      @[<hov 1>(inline@ %a)@]@ \
+      @[<hov 1>(effs@ %a)@]@ \
+      @[<hov 1>(var@ %a)@]@ \
+      @[<hov 1>(expr@ %a)@]\
+    )@]"
+    order
+    print_inline inline
+    Ece.print effs
+    Backend_var.With_provenance.print cmm_var
+    Printcmm.expression cmm_expr
+
 (* Code and closures *)
 
 let get_code_metadata env code_id =
@@ -246,7 +266,8 @@ let create_binding =
     in
     env, binding
 
-let bind_variable ?extra env var ~effects_and_coeffects_of_defining_expr:effs
+let bind_variable ?extra env var
+    ~effects_and_coeffects_of_defining_expr:effs
     ~inline ~defining_expr =
   let env, binding =
     create_binding ?extra env ~inline effs var defining_expr
@@ -256,8 +277,9 @@ let bind_variable ?extra env var ~effects_and_coeffects_of_defining_expr:effs
     (* check that the effects and coeffects allow the expression to be duplicated
        without changing semantics *)
     begin match (effs : Ece.t) with
-      | (Only_generative_effects Immutable | No_effects), No_coeffects -> ()
-      | _ ->
+      | (Only_generative_effects Immutable | No_effects), No_coeffects, _ -> ()
+      | (No_effects | Arbitrary_effects | Only_generative_effects (Immutable | Mutable | Immutable_unique)),
+        (No_coeffects | Has_coeffects), _ ->
         Misc.fatal_errorf
           "Inccorect effects and/or coeffects for a duplicated binding: %a"
           print_binding binding
@@ -269,7 +291,7 @@ let bind_variable ?extra env var ~effects_and_coeffects_of_defining_expr:effs
        CR: this allows to move allocations past function calls (and other
        effectful expressions), which can break some allocation-counting tests. *)
     { env with pures = Variable.Map.add var binding env.pures }
-  | _ ->
+  | Inline_once | Do_not_inline ->
     begin match To_cmm_effects.classify_by_effects_and_coeffects effs with
     | Pure -> { env with pures = Variable.Map.add var binding env.pures }
     | Effect -> { env with stages = Effect (var, binding) :: env.stages }
@@ -286,26 +308,22 @@ let bind_variable ?extra env var ~effects_and_coeffects_of_defining_expr:effs
       { env with stages }
     end
 
-(*
-let bind_variable ?extra env v
-    ~(num_normal_occurrences_of_bound_vars : _ Or_unknown.t)
-    ~effects_and_coeffects_of_defining_expr ~defining_expr =
-  let[@inline] bind_variable0 ~inline =
-    bind_variable0 env v ?extra ~effects_and_coeffects_of_defining_expr
-      ~inline ~defining_expr
-  in
-  match num_normal_occurrences_of_bound_vars with
-  | Unknown -> bind_variable0 ~may_inline:Do_not_inline
-  | Known num_normal_occurrences_of_bound_vars -> (
-    match
-      To_cmm_effects.classify_let_binding v
-        ~effects_and_coeffects_of_defining_expr
-        ~num_normal_occurrences_of_bound_vars
-    with
-    | Drop_defining_expr -> env
-    | May_inline -> bind_variable0 ~may_inline:Inline_once
-    | Regular -> bind_variable0 ~may_inline:Do_not_inline)
-*)
+let bind_let_variable ?extra env var
+    ~effects_and_coeffects_of_defining_expr
+    ~inline ~defining_expr
+  =
+  match (inline : To_cmm_effects.let_binding_classification) with
+  | Drop_defining_expr -> env
+  | Regular ->
+    bind_variable ?extra env var ~effects_and_coeffects_of_defining_expr
+      ~defining_expr ~inline:Do_not_inline
+  | May_inline_once ->
+    bind_variable ?extra env var ~effects_and_coeffects_of_defining_expr
+      ~defining_expr ~inline:Inline_once
+  | Inline_and_duplicate ->
+    bind_variable ?extra env var ~effects_and_coeffects_of_defining_expr
+      ~defining_expr ~inline:Duplicate
+
 
 (* Variable lookup (for potential inlining) *)
 
@@ -373,7 +391,7 @@ let inline_variable env var =
               else { env with stages = Coeffect_only coeffects :: prev_stages }
             in
             will_inline env binding
-        end
+        end))
 
 (* Flushing delayed bindings *)
 

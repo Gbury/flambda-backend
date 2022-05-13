@@ -147,37 +147,17 @@ let match_var_with_extra_info env simple : Env.extra_info option =
         ~symbol:(fun _ -> None)
         ~var:(fun var -> Env.extra_info env var))
 
-(*
-(* Helpers for the translation of [Let] expressions *)
-
-let let_expr_bind ?extra env v ~num_normal_occurrences_of_bound_vars cmm_expr
-    ~effects_and_coeffects_of_defining_expr =
-  match
-    To_cmm_effects.classify_let_expr v ~effects_and_coeffects_of_defining_expr
-      ~num_normal_occurrences_of_bound_vars
-  with
-  | Drop_defining_expr -> env
-  | Inline_once ->
-    Env.bind_variable env v ?extra effects_and_coeffects_of_defining_expr Env.Inline_once
-      cmm_expr
-  | Duplicate ->
-    Env.bind_variable env v ?extra effects_and_coeffects_of_defining_expr Env.Duplicate
-      cmm_expr
-  | Regular ->
-    Env.bind_variable env v ?extra effects_and_coeffects_of_defining_expr Env.Do_not_inline
-      cmm_expr
-*)
-
 (* Helper for the translation of [Simple]s. *)
 
 let bind_simple ~dbg env v ~num_normal_occurrences_of_bound_vars s =
   let defining_expr, env, effects_and_coeffects_of_defining_expr =
     C.simple ~dbg env s
   in
-  Env.bind_variable env v
-    ~num_normal_occurrences_of_bound_vars:
-      (Known num_normal_occurrences_of_bound_vars)
+  Env.bind_let_variable env v
     ~effects_and_coeffects_of_defining_expr ~defining_expr
+    ~inline:(To_cmm_effects.classify_let_binding v
+               ~num_normal_occurrences_of_bound_vars
+               ~effects_and_coeffects_of_defining_expr)
 
 (* Helpers for the translation of [Apply] expressions. *)
 
@@ -422,10 +402,11 @@ and let_expr env res let_expr =
             Ece.join effs (Flambda_primitive.effects_and_coeffects p)
           in
           let env =
-            Env.bind_variable ?extra env v
-              ~num_normal_occurrences_of_bound_vars:
-                (Known num_normal_occurrences_of_bound_vars)
+            Env.bind_let_variable ?extra env v
               ~effects_and_coeffects_of_defining_expr ~defining_expr
+              ~inline:(To_cmm_effects.classify_let_binding v
+                         ~num_normal_occurrences_of_bound_vars
+                         ~effects_and_coeffects_of_defining_expr)
           in
           expr env res body
         | Set_of_closures bound_vars, Set_of_closures soc ->
@@ -635,19 +616,21 @@ and apply_expr env res e =
           Variable.Map.singleton var Num_occurrences.Zero
         in
         let env =
-          Env.bind_variable env var
-            ~num_normal_occurrences_of_bound_vars:
-              (Known num_normal_occurrences_of_bound_vars)
+          Env.bind_let_variable env var
             ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
+            ~inline:(To_cmm_effects.classify_let_binding var
+                       ~num_normal_occurrences_of_bound_vars
+                       ~effects_and_coeffects_of_defining_expr:effs)
         in
         expr env res body
       | [param] ->
         let var = Bound_parameter.var param in
         let env =
-          Env.bind_variable env var
-            ~num_normal_occurrences_of_bound_vars:
-              (Known handler_params_occurrences)
+          Env.bind_let_variable env var
             ~effects_and_coeffects_of_defining_expr:effs ~defining_expr:call
+            ~inline:(To_cmm_effects.classify_let_binding var
+                       ~num_normal_occurrences_of_bound_vars:handler_params_occurrences
+                       ~effects_and_coeffects_of_defining_expr:effs)
         in
         expr env res body
       | _ :: _ -> unsupported ())

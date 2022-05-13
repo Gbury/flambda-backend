@@ -81,7 +81,7 @@ let classify_let_binding var
       if Flambda_features.Expert.inline_effects_in_cmm ()
       then May_inline_once
       else Regular
-    | No_effects, _, _ -> Inline_once
+    | No_effects, _, _ -> May_inline_once
   end
   | More_than_one -> begin
     match effects_and_coeffects_of_defining_expr with

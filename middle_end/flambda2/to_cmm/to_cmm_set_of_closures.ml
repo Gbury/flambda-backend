@@ -395,7 +395,9 @@ let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr =
       (fun acc cid v ->
         let v = Bound_var.var v in
         let sym = C.symbol ~dbg (Function_slot.Map.find cid closure_symbols) in
-        Env.bind_variable acc v Ece.pure_duplicatable Env.Duplicate sym)
+        Env.bind_variable acc v
+          ~inline:Env.Duplicate ~defining_expr:sym
+          ~effects_and_coeffects_of_defining_expr:Ece.pure_duplicatable)
       env cids bound_vars
   in
   translate_expr env res body
@@ -429,7 +431,11 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
     C.make_alloc ~mode:(Alloc_mode.to_lambda closure_alloc_mode) dbg tag l
   in
   let soc_var = Variable.create "*set_of_closures*" in
-  let env = Env.bind_variable env soc_var effs Env.Do_not_inline csoc in
+  let env =
+    Env.bind_variable env soc_var
+      ~inline:Env.Do_not_inline ~defining_expr:csoc
+      ~effects_and_coeffects_of_defining_expr:effs
+  in
   (* Get from the env the cmm variable that was created and bound to the
      compiled set of closures. *)
   let soc_cmm_var, env, peff = Env.inline_variable env soc_var in
@@ -437,7 +443,7 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
     match To_cmm_effects.classify_by_effects_and_coeffects peff with
     | Pure -> true
     | Effect | Coeffect_only -> false);
-  (* Add env bindings for all of the value slots. *)
+  (* Helper function to get the a cmm expr for a closure offset *)
   let get_closure_by_offset env set_cmm function_slot =
     match
       Exported_offsets.function_slot_offset (Env.exported_offsets env)
@@ -458,10 +464,11 @@ let let_dynamic_set_of_closures0 env res ~body ~bound_vars set
         | None -> acc
         | Some (defining_expr, effects_and_coeffects_of_defining_expr) ->
           let v = Bound_var.var v in
-          Env.bind_variable acc v
-            ~num_normal_occurrences_of_bound_vars:
-              (Known num_normal_occurrences_of_bound_vars)
-            ~effects_and_coeffects_of_defining_expr ~defining_expr)
+          Env.bind_let_variable acc v
+            ~defining_expr ~effects_and_coeffects_of_defining_expr
+            ~inline:(To_cmm_effects.classify_let_binding v
+                       ~effects_and_coeffects_of_defining_expr
+                       ~num_normal_occurrences_of_bound_vars))
       env
       (Function_slot.Lmap.keys decls)
       bound_vars

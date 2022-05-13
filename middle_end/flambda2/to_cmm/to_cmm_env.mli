@@ -136,11 +136,22 @@ val bind_variable :
   ?extra:extra_info ->
   t ->
   Variable.t ->
-  ?extra:extra_info ->
-  Effects_and_coeffects.t ->
-  inline ->
-  Cmm.expression ->
+  effects_and_coeffects_of_defining_expr:Effects_and_coeffects.t ->
+  inline:inline ->
+  defining_expr:Cmm.expression ->
   t
+
+(** Bind a variable to the given Cmm expression, to allow for delaying the
+    let-binding. *)
+val bind_let_variable :
+  ?extra:extra_info ->
+  t ->
+  Variable.t ->
+  effects_and_coeffects_of_defining_expr:Effects_and_coeffects.t ->
+  inline:To_cmm_effects.let_binding_classification ->
+  defining_expr:Cmm.expression ->
+  t
+
 
 (** Try and inline an Flambda variable using the delayed let-bindings. *)
 val inline_variable :
