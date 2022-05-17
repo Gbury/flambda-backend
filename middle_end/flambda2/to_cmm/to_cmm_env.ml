@@ -347,6 +347,7 @@ let inline_variable env var =
       | Do_not_inline ->
         will_not_inline env binding
       | Duplicate ->
+        (* duplicated bindings need to stay in the map of pure bindings *)
         will_inline env binding
       | Inline_once ->
         (* Pure bindings may be inlined at most once. *)
@@ -422,7 +423,8 @@ let flush_delayed_lets ?(entering_loop = false) env =
       (fun _ b acc ->
          match b.inline with
          (* We drop bindings that have been marked as being inlined and duplicated. *)
-         | Duplicate -> acc
+         | Duplicate ->
+           Misc.fatal_errorf "Duplicated binding should never be flushed"
          | Inline_once | Do_not_inline ->
            Cmm_helpers.letin b.cmm_var ~defining_expr:b.cmm_expr ~body:acc)
       order_map e
@@ -434,7 +436,13 @@ let flush_delayed_lets ?(entering_loop = false) env =
      loops. *)
   let pures_to_keep, pures_to_flush =
     if entering_loop
-    then Variable.Map.empty, env.pures
+    then
+      Variable.Map.partition
+        (fun _ binding ->
+           match binding.inline with
+           | Duplicate -> true
+           | Inline_once | Do_not_inline -> false)
+        env.pures
     else
       Variable.Map.partition
         (fun _ binding ->
@@ -445,3 +453,4 @@ let flush_delayed_lets ?(entering_loop = false) env =
   in
   let flush e = flush pures_to_flush env.stages e in
   flush, { env with stages = []; pures = pures_to_keep }
+
