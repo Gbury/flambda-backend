@@ -38,6 +38,7 @@ val symbol_from_linkage_name :
 val symbol : dbg:Debuginfo.t -> Symbol.t -> Cmm.expression
 
 val name :
+  inline:bool ->
   To_cmm_env.t ->
   Name.t ->
   Cmm.expression * To_cmm_env.t * Effects_and_coeffects.t
@@ -45,6 +46,7 @@ val name :
 val const : dbg:Debuginfo.t -> Reg_width_const.t -> Cmm.expression
 
 val simple :
+  inline:bool ->
   dbg:Debuginfo.t ->
   To_cmm_env.t ->
   Simple.t ->
@@ -54,6 +56,7 @@ val simple_static :
   Simple.t -> [`Data of Cmm.data_item list | `Var of Variable.t]
 
 val simple_list :
+  inline:bool ->
   dbg:Debuginfo.t ->
   To_cmm_env.t ->
   Simple.t list ->

@@ -157,6 +157,10 @@ val bind_let_variable :
 val inline_variable :
   t -> Variable.t -> Cmm.expression * t * Effects_and_coeffects.t
 
+(** Same as [inline_variable] but prevents any inlining/substitution. *)
+val find_variable :
+  t -> Variable.t -> Cmm.expression * t * Effects_and_coeffects.t
+
 (** Wrap the given Cmm expression with all the delayed let bindings accumulated
     in the environment. *)
 val flush_delayed_lets :

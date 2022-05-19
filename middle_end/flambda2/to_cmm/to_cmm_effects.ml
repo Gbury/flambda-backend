@@ -76,12 +76,13 @@ let classify_let_binding var
        Deep expressions involving arbitrary effects are less common, so inlining
        for these expressions is controlled by the global [inline_effects_in_cmm]
        setting. *)
-    | Only_generative_effects _, _, _ -> May_inline_once
-    | Arbitrary_effects, _, _ ->
+    | _, _, Delay -> Inline_and_duplicate
+    | Only_generative_effects _, _, Strict -> May_inline_once
+    | Arbitrary_effects, _, Strict ->
       if Flambda_features.Expert.inline_effects_in_cmm ()
       then May_inline_once
       else Regular
-    | No_effects, _, _ -> May_inline_once
+    | No_effects, _, Strict -> May_inline_once
   end
   | More_than_one -> begin
     match effects_and_coeffects_of_defining_expr with

@@ -281,7 +281,7 @@ let bind_variable ?extra env var
       | (No_effects | Arbitrary_effects | Only_generative_effects (Immutable | Mutable | Immutable_unique)),
         (No_coeffects | Has_coeffects), _ ->
         Misc.fatal_errorf
-          "Inccorect effects and/or coeffects for a duplicated binding: %a"
+          "Incorect effects and/or coeffects for a duplicated binding: %a"
           print_binding binding
     end;
     (* We bind duplicated bindings as pure so that they are inlined/subtituted
@@ -340,7 +340,7 @@ let will_not_inline_var env v =
     Misc.fatal_errorf "Variable %a not found in env" Variable.print v
   | e -> e, env, Ece.pure_duplicatable
 
-let inline_variable env var =
+let get_variable ~inline_once env var =
   match Variable.Map.find var env.pures with
   | binding ->
     begin match binding.inline with
@@ -350,9 +350,12 @@ let inline_variable env var =
         (* duplicated bindings need to stay in the map of pure bindings *)
         will_inline env binding
       | Inline_once ->
-        (* Pure bindings may be inlined at most once. *)
-        let pures = Variable.Map.remove var env.pures in
-        will_inline { env with pures } binding
+        if inline_once then
+          (* Pure bindings may be inlined at most once. *)
+          let pures = Variable.Map.remove var env.pures in
+          will_inline { env with pures } binding
+        else
+          will_not_inline env binding
     end
   | exception Not_found -> (
     match env.stages with
@@ -370,7 +373,10 @@ let inline_variable env var =
       then will_not_inline_var env var
       else begin match binding.inline with
         | Do_not_inline -> will_not_inline env binding
-        | Inline_once -> will_inline { env with stages = prev_stages } binding
+        | Inline_once ->
+          if inline_once
+          then will_inline { env with stages = prev_stages } binding
+          else will_not_inline env binding
         | Duplicate -> assert false
       end
     | Coeffect_only coeffects :: prev_stages -> (
@@ -385,14 +391,20 @@ let inline_variable env var =
           | Do_not_inline -> will_not_inline env binding
           | Duplicate -> assert false
           | Inline_once ->
-            let coeffects = Variable.Map.remove var coeffects in
-            let env =
-              if Variable.Map.is_empty coeffects
-              then { env with stages = prev_stages }
-              else { env with stages = Coeffect_only coeffects :: prev_stages }
-            in
-            will_inline env binding
+            if inline_once then
+              let coeffects = Variable.Map.remove var coeffects in
+              let env =
+                if Variable.Map.is_empty coeffects
+                then { env with stages = prev_stages }
+                else { env with stages = Coeffect_only coeffects :: prev_stages }
+              in
+              will_inline env binding
+            else
+              will_not_inline env binding
         end))
+
+let find_variable = get_variable ~inline_once:false
+let inline_variable = get_variable ~inline_once:true
 
 (* Flushing delayed bindings *)
 

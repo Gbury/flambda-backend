@@ -17,6 +17,7 @@
 (** Translation of Flambda primitives to Cmm. *)
 
 val prim :
+  inline:To_cmm_effects.let_binding_classification ->
   To_cmm_env.t ->
   To_cmm_result.t ->
   Debuginfo.t ->

@@ -694,29 +694,37 @@ let variadic_primitive _env dbg f args =
 
 (* CR Gbury: check the order in which the primitive arguments are given to
    [Env.inline_variable]. *)
-let prim env res dbg p =
+let prim ~inline env res dbg p =
+  let inline =
+    match (inline : To_cmm_effects.let_binding_classification) with
+    | Regular -> true
+    | Drop_defining_expr -> false
+    | May_inline_once -> true
+    | Inline_and_duplicate -> false
+  in
   match (p : P.t) with
   | Nullary prim ->
     let extra, expr = nullary_primitive env dbg prim in
     expr, extra, env, res, Ece.pure
   | Unary (f, x) ->
-    let x, env, eff = C.simple ~dbg env x in
+    let x, env, eff = C.simple ~inline ~dbg env x in
     let extra, res, expr = unary_primitive env res dbg f x in
     expr, extra, env, res, eff
   | Binary (f, x, y) ->
-    let x, env, effx = C.simple ~dbg env x in
-    let y, env, effy = C.simple ~dbg env y in
+    let x, env, effx = C.simple ~inline ~dbg env x in
+    let y, env, effy = C.simple ~inline ~dbg env y in
     let effs = Ece.join effx effy in
     let expr = binary_primitive env dbg f x y in
     expr, None, env, res, effs
   | Ternary (f, x, y, z) ->
-    let x, env, effx = C.simple ~dbg env x in
-    let y, env, effy = C.simple ~dbg env y in
-    let z, env, effz = C.simple ~dbg env z in
+    let x, env, effx = C.simple ~inline ~dbg env x in
+    let y, env, effy = C.simple ~inline ~dbg env y in
+    let z, env, effz = C.simple ~inline ~dbg env z in
     let effs = Ece.join (Ece.join effx effy) effz in
     let expr = ternary_primitive env dbg f x y z in
     expr, None, env, res, effs
   | Variadic (f, l) ->
-    let args, env, effs = C.simple_list ~dbg env l in
+    let args, env, effs = C.simple_list ~inline ~dbg env l in
     let expr = variadic_primitive env dbg f args in
     expr, None, env, res, effs
+

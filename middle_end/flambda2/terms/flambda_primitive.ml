@@ -982,12 +982,16 @@ let effects_and_coeffects_of_unary_primitive p =
   | Tag_immediate ->
     Effects.No_effects, Coeffects.No_coeffects, Placement.Strict
   | Box_number (_, alloc_mode) ->
+    (* Ensure boxing operations for numbers are inlined/substituted in to_cmm *)
+    let placement : Placement.t =
+      if Flambda_features.classic_mode () then Delay else Strict
+    in
     let coeffects : Coeffects.t =
       match alloc_mode with
       | Heap -> Coeffects.No_coeffects
       | Local -> Coeffects.Has_coeffects
     in
-    Effects.Only_generative_effects Immutable, coeffects, Placement.Strict
+    Effects.Only_generative_effects Immutable, coeffects, placement
   | Project_function_slot _ | Project_value_slot _ ->
     Effects.No_effects, Coeffects.No_coeffects, Placement.Delay
   | Is_boxed_float | Is_flat_float_array ->
