@@ -151,7 +151,7 @@ let match_var_with_extra_info env simple : Env.extra_info option =
 
 let bind_simple ~dbg env v ~num_normal_occurrences_of_bound_vars s =
   let defining_expr, env, effects_and_coeffects_of_defining_expr =
-    C.simple ~inline:true ~dbg env s
+    C.simple ~dbg env s
   in
   Env.bind_let_variable env v
     ~effects_and_coeffects_of_defining_expr ~defining_expr
@@ -188,11 +188,11 @@ let apply_call env e =
       return_arity |> Flambda_arity.With_subkinds.to_arity
       |> machtype_of_return_arity
     in
-    let args, env, _ = C.simple_list ~inline:true ~dbg env args in
+    let args, env, _ = C.simple_list ~dbg env args in
     let args, env =
       if Code_metadata.is_my_closure_used info
       then
-        let f, env, _ = C.simple ~inline:true ~dbg env f in
+        let f, env, _ = C.simple ~dbg env f in
         args @ [f], env
       else args, env
     in
@@ -212,8 +212,8 @@ let apply_call env e =
         effs ))
   | Function { function_call = Indirect_unknown_arity; alloc_mode } ->
     fail_if_probe e;
-    let f, env, _ = C.simple ~inline:true ~dbg env f in
-    let args, env, _ = C.simple_list ~inline:true ~dbg env args in
+    let f, env, _ = C.simple ~dbg env f in
+    let args, env, _ = C.simple_list ~dbg env args in
     ( C.indirect_call ~dbg typ_val (Alloc_mode.to_lambda alloc_mode) f args,
       env,
       effs )
@@ -228,8 +228,8 @@ let apply_call env e =
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate it"
     else
-      let f, env, _ = C.simple ~inline:true ~dbg env f in
-      let args, env, _ = C.simple_list ~inline:true ~dbg env args in
+      let f, env, _ = C.simple ~dbg env f in
+      let args, env, _ = C.simple_list ~dbg env args in
       let ty =
         return_arity |> Flambda_arity.With_subkinds.to_arity
         |> machtype_of_return_arity
@@ -246,7 +246,7 @@ let apply_call env e =
     assert (String.sub f 0 9 = ".extern__");
     let f = String.sub f 9 (len - 9) in
     let returns = apply_returns e in
-    let args, env, _ = C.simple_list ~inline:true ~dbg env args in
+    let args, env, _ = C.simple_list ~dbg env args in
     let ty = machtype_of_return_arity return_arity in
     let wrap = wrap_extcall_result return_arity in
     let ty_args =
@@ -257,12 +257,10 @@ let apply_call env e =
       effs )
   | Call_kind.Method { kind; obj; alloc_mode } ->
     fail_if_probe e;
-    (* CR gbury: maybe it'd be simpler to prevent inlining of vars here to avoid
-       problems related to order of evaluation ? *)
-    let obj, env, _ = C.simple ~inline:true ~dbg env obj in
-    let meth, env, _ = C.simple ~inline:true ~dbg env f in
+    let obj, env, _ = C.simple ~dbg env obj in
+    let meth, env, _ = C.simple ~dbg env f in
     let kind = meth_kind kind in
-    let args, env, _ = C.simple_list ~inline:true ~dbg env args in
+    let args, env, _ = C.simple_list ~dbg env args in
     let alloc_mode = Alloc_mode.to_lambda alloc_mode in
     C.send kind meth obj args (Rc_normal, alloc_mode) dbg, env, effs
 
@@ -281,7 +279,7 @@ let wrap_call_exn ~dbg env e call k_exn =
        `To_cmm_shared.simple_list`, namely the first simple translated (and
        potentially inlined/substituted) is evaluted last. *)
     let aux (call, env) (arg, _k) v =
-      let arg, env, _ = C.simple ~inline:true ~dbg env arg in
+      let arg, env, _ = C.simple ~dbg env arg in
       C.sequence (C.assign v arg) call, env
     in
     List.fold_left2 aux (call, env) extra_args mut_vars
@@ -311,8 +309,8 @@ let apply_cont_exn env e k = function
           Apply_cont.print e
     in
     let dbg = Apply_cont.debuginfo e in
-    let exn, env, _ = C.simple ~inline:true ~dbg env exn in
-    let extra, env, _ = C.simple_list ~inline:true ~dbg env extra in
+    let exn, env, _ = C.simple ~dbg env exn in
+    let extra, env, _ = C.simple_list ~dbg env extra in
     let mut_vars = Env.get_exn_extra_args env k in
     let wrap, _ = Env.flush_delayed_lets env in
     let cmm = C.raise_prim raise_kind exn (Apply_cont.debuginfo e) in
@@ -340,7 +338,7 @@ let apply_cont_jump env res e types cont args =
   then
     let trap_actions = apply_cont_trap_actions env e in
     let dbg = Apply_cont.debuginfo e in
-    let args, env, _ = C.simple_list ~inline:true ~dbg env args in
+    let args, env, _ = C.simple_list ~dbg env args in
     let wrap, _ = Env.flush_delayed_lets env in
     wrap (C.cexit cont args trap_actions), res
   else
@@ -353,7 +351,7 @@ let apply_cont_jump env res e types cont args =
 let apply_cont_ret env e k = function
   | [ret] -> (
     let dbg = Apply_cont.debuginfo e in
-    let ret, env, _ = C.simple ~inline:true ~dbg env ret in
+    let ret, env, _ = C.simple ~dbg env ret in
     let wrap, _ = Env.flush_delayed_lets env in
     match Apply_cont.trap_action e with
     | None -> wrap ret
@@ -691,7 +689,7 @@ and apply_cont env res e =
 and switch env res s =
   let scrutinee = Switch.scrutinee s in
   let dbg = Switch.condition_dbg s in
-  let e, env, _ = C.simple ~inline:true ~dbg env scrutinee in
+  let e, env, _ = C.simple ~dbg env scrutinee in
   let arms = Switch.arms s in
   (* For binary switches, which can be translated to an if-then-else, it can be
      interesting to *not* untag the scrutinee (particularly for those coming

@@ -209,7 +209,7 @@ module Dynamic = Make_layout_filler (struct
    order, so that the first translated field is actually evaluated
    last. *)
   let simple ~dbg env simple =
-    let term, env, eff = C.simple ~inline:true ~dbg env simple in
+    let term, env, eff = C.simple ~dbg env simple in
     `Data [term], env, eff
 
   let infix_header ~dbg ~function_slot_offset =

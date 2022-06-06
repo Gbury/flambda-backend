@@ -66,12 +66,10 @@ let symbol_from_linkage_name ~dbg ln =
 
 let symbol ~dbg sym = symbol_from_linkage_name ~dbg (Symbol.linkage_name sym)
 
-let name ~inline env name =
+let name env name =
   Name.pattern_match name
     ~var:(fun v ->
-        if inline
-        then To_cmm_env.inline_variable env v
-        else To_cmm_env.find_variable env v)
+        To_cmm_env.inline_variable env v)
     ~symbol:(fun s ->
       (* CR mshinwell: fix debuginfo? *)
       symbol ~dbg:Debuginfo.none s, env, Ece.pure_duplicatable)
@@ -86,9 +84,9 @@ let const ~dbg cst =
   | Naked_int64 i -> int64 ~dbg i
   | Naked_nativeint t -> targetint ~dbg t
 
-let simple ~inline ~dbg env s =
+let simple ~dbg env s =
   Simple.pattern_match s
-    ~name:(fun n ~coercion:_ -> name ~inline env n)
+    ~name:(fun n ~coercion:_ -> name env n)
     ~const:(fun c -> const ~dbg c, env, Ece.pure_duplicatable)
 
 let name_static name =
@@ -118,9 +116,9 @@ let simple_static s =
     ~name:(fun n ~coercion:_ -> name_static n)
     ~const:(fun c -> `Data (const_static c))
 
-let simple_list ~inline ~dbg env l =
+let simple_list ~dbg env l =
   let aux (list, env, effs) x =
-    let y, env, eff = simple ~inline ~dbg env x in
+    let y, env, eff = simple ~dbg env x in
     y :: list, env, Ece.join eff effs
   in
   let args, env, effs = List.fold_left aux ([], env, Ece.pure_duplicatable) l in
