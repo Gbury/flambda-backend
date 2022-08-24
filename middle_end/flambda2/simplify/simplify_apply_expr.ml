@@ -34,18 +34,32 @@ let warn_not_inlined_if_needed apply reason =
       (Debuginfo.to_location (Apply.dbg apply))
       (Warnings.Inlining_impossible reason)
 
-(* Note that this considers that the extra arguments of the exn_continuation are
-   always used. *)
-let record_free_names_of_apply_as_used0 apply data_flow =
-  let data_flow =
-    Data_flow.add_used_in_current_handler (Apply.free_names apply) data_flow
+let record_free_names_of_apply_as_used0 apply ~use_id ~exn_cont_use_id data_flow
+    =
+  let free_names_of_function_and_args =
+    let callee = Apply.callee apply in
+    let args = Apply.args apply in
+    Name_occurrences.union (Simple.free_names callee)
+      (Simple.List.free_names args)
   in
-  match Apply.continuation apply with
-  | Never_returns -> data_flow
-  | Return k -> Data_flow.add_apply_result_cont k data_flow
+  let data_flow =
+    Flow.Acc.add_used_in_current_handler free_names_of_function_and_args
+      data_flow
+  in
+  let exn_cont = Apply.exn_continuation apply in
+  let result_cont =
+    match Apply.continuation apply, use_id with
+    | Never_returns, None -> None
+    | Return k, Some use_id -> Some (use_id, k)
+    | Never_returns, Some _ | Return _, None -> assert false
+  in
+  Flow.Acc.add_apply_conts
+    ~exn_cont:(exn_cont_use_id, exn_cont)
+    ~result_cont data_flow
 
-let record_free_names_of_apply_as_used dacc apply =
-  DA.map_data_flow dacc ~f:(record_free_names_of_apply_as_used0 apply)
+let record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply =
+  DA.map_flow_acc dacc
+    ~f:(record_free_names_of_apply_as_used0 ~use_id ~exn_cont_use_id apply)
 
 let simplify_direct_tuple_application ~simplify_expr dacc apply
     ~params_arity:param_arity ~result_arity ~apply_alloc_mode
@@ -176,7 +190,6 @@ let simplify_direct_full_application0 ~simplify_expr dacc apply function_type
   match inlined with
   | Some (dacc, inlined) -> simplify_expr dacc inlined ~down_to_up
   | None ->
-    let dacc = record_free_names_of_apply_as_used dacc apply in
     let dacc, use_id, result_continuation =
       let result_continuation = Apply.continuation apply in
       match result_continuation, result_types with
@@ -266,6 +279,9 @@ let simplify_direct_full_application0 ~simplify_expr dacc apply function_type
              (Exn_continuation.arity (Apply.exn_continuation apply)))
     in
     let apply = Apply.with_continuation apply result_continuation in
+    let dacc =
+      record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
+    in
     down_to_up dacc
       ~rebuild:
         (rebuild_non_inlined_direct_full_application apply ~use_id
@@ -780,7 +796,6 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
       ~tracker:(DE.inlining_history_tracker denv)
       ~apply ();
   let env_at_use = denv in
-  let dacc = record_free_names_of_apply_as_used dacc apply in
   let dacc, exn_cont_use_id =
     DA.record_continuation_use dacc
       (Exn_continuation.exn_handler (Apply.exn_continuation apply))
@@ -839,6 +854,10 @@ let simplify_function_call_where_callee's_type_unavailable dacc apply
           apply_alloc_mode
       in
       call_kind, use_id, dacc
+  in
+  let dacc =
+    record_free_names_of_apply_as_used ~use_id:(Some use_id) ~exn_cont_use_id
+      dacc apply
   in
   down_to_up dacc
     ~rebuild:
@@ -989,7 +1008,6 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~arg_types
     Misc.fatal_errorf
       "All arguments to a method call must be of kind [Value]:@ %a" Apply.print
       apply;
-  let dacc = record_free_names_of_apply_as_used dacc apply in
   let dacc, use_id =
     DA.record_continuation_use dacc apply_cont
       (Non_inlinable { escaping = true })
@@ -1003,6 +1021,10 @@ let simplify_method_call dacc apply ~callee_ty ~kind:_ ~obj ~arg_types
       ~arg_types:
         (T.unknown_types_from_arity_with_subkinds
            (Exn_continuation.arity (Apply.exn_continuation apply)))
+  in
+  let dacc =
+    record_free_names_of_apply_as_used dacc ~use_id:(Some use_id)
+      ~exn_cont_use_id apply
   in
   down_to_up dacc ~rebuild:(rebuild_method_call apply ~use_id ~exn_cont_use_id)
 
@@ -1058,7 +1080,6 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~param_arity
     in
     simplify_expr dacc expr ~down_to_up
   | Unchanged { return_types } ->
-    let dacc = record_free_names_of_apply_as_used dacc apply in
     let dacc, use_id =
       match Apply.continuation apply with
       | Return apply_continuation ->
@@ -1086,6 +1107,9 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~param_arity
         ~arg_types:
           (T.unknown_types_from_arity_with_subkinds
              (Exn_continuation.arity (Apply.exn_continuation apply)))
+    in
+    let dacc =
+      record_free_names_of_apply_as_used dacc ~use_id ~exn_cont_use_id apply
     in
     down_to_up dacc
       ~rebuild:(rebuild_c_call apply ~use_id ~exn_cont_use_id ~return_arity)
