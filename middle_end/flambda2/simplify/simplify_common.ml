@@ -188,7 +188,7 @@ let split_direct_over_application apply ~result_arity
           (Bound_pattern.singleton
              (Bound_var.create (Variable.create "unit") Name_mode.normal))
           (Named.create_prim
-             (Unary (End_region, Simple.var region))
+             (Unary (End_region {free_names = call_return_continuation_free_names} , Simple.var region))
              (Apply.dbg apply))
           ~body:call_return_continuation
           ~free_names_of_body:(Known call_return_continuation_free_names)

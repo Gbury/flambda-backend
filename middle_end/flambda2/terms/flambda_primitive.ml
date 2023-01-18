@@ -669,7 +669,7 @@ type unary_primitive =
   | Is_boxed_float
   | Is_flat_float_array
   | Begin_try_region
-  | End_region
+  | End_region of { free_names : Name_occurrences.t; }
   | Obj_dup
 
 (* Here and below, operations that are genuine projections shouldn't be eligible
@@ -701,7 +701,7 @@ let unary_primitive_eligible_for_cse p ~arg =
     Simple.is_var arg
   | Project_function_slot _ | Project_value_slot _ -> false
   | Is_boxed_float | Is_flat_float_array -> true
-  | Begin_try_region | End_region | Obj_dup -> false
+  | Begin_try_region | End_region _ | Obj_dup -> false
 
 let compare_unary_primitive p1 p2 =
   let unary_primitive_numbering p =
@@ -729,7 +729,7 @@ let compare_unary_primitive p1 p2 =
     | Is_boxed_float -> 20
     | Is_flat_float_array -> 21
     | Begin_try_region -> 22
-    | End_region -> 23
+    | End_region _ -> 23
     | Obj_dup -> 24
   in
   match p1, p2 with
@@ -807,7 +807,7 @@ let compare_unary_primitive p1 p2 =
       | Array_length | Bigarray_length _ | Unbox_number _ | Box_number _
       | Untag_immediate | Tag_immediate | Project_function_slot _
       | Project_value_slot _ | Is_boxed_float | Is_flat_float_array
-      | Begin_try_region | End_region | Obj_dup ),
+      | Begin_try_region | End_region _ | Obj_dup ),
       _ ) ->
     Stdlib.compare (unary_primitive_numbering p1) (unary_primitive_numbering p2)
 
@@ -858,7 +858,7 @@ let print_unary_primitive ppf p =
   | Is_boxed_float -> fprintf ppf "Is_boxed_float"
   | Is_flat_float_array -> fprintf ppf "Is_flat_float_array"
   | Begin_try_region -> Format.pp_print_string ppf "Begin_try_region"
-  | End_region -> Format.pp_print_string ppf "End_region"
+  | End_region _ -> Format.pp_print_string ppf "End_region"
   | Obj_dup -> Format.pp_print_string ppf "Obj_dup"
 
 let arg_kind_of_unary_primitive p =
@@ -882,7 +882,7 @@ let arg_kind_of_unary_primitive p =
   | Is_flat_float_array ->
     K.value
   | Begin_try_region -> K.region
-  | End_region -> K.region
+  | End_region _ -> K.region
   | Obj_dup -> K.value
 
 let result_kind_of_unary_primitive p : result_kind =
@@ -909,7 +909,7 @@ let result_kind_of_unary_primitive p : result_kind =
     Singleton K.value
   | Is_boxed_float | Is_flat_float_array -> Singleton K.naked_immediate
   | Begin_try_region -> Singleton K.region
-  | End_region -> Singleton K.value
+  | End_region _ -> Singleton K.value
   | Obj_dup -> Singleton K.value
 
 let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
@@ -990,7 +990,7 @@ let effects_and_coeffects_of_unary_primitive p : Effects_and_coeffects.t =
     (* Tags on heap blocks are immutable. *)
     No_effects, No_coeffects, Strict
   | Begin_try_region -> effects_and_coeffects_of_begin_region
-  | End_region ->
+  | End_region _  ->
     (* These can't be [Only_generative_effects] or the primitives would get
        deleted without regard to prior uses of the region. Instead there are
        special cases in [Simplify_let_expr] and [Expr_builder] for this
@@ -1013,7 +1013,7 @@ let unary_classify_for_printing p =
   | Box_number _ | Tag_immediate -> Constructive
   | Project_function_slot _ | Project_value_slot _ -> Destructive
   | Is_boxed_float | Is_flat_float_array -> Neither
-  | Begin_try_region | End_region -> Neither
+  | Begin_try_region | End_region _ -> Neither
 
 let free_names_unary_primitive p =
   match p with
@@ -1033,7 +1033,7 @@ let free_names_unary_primitive p =
   | Int_as_pointer | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
   | Reinterpret_int64_as_float | Float_arith _ | Array_length
   | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
-  | Is_boxed_float | Is_flat_float_array | Begin_try_region | End_region
+  | Is_boxed_float | Is_flat_float_array | Begin_try_region | End_region _
   | Obj_dup ->
     Name_occurrences.empty
 
@@ -1044,11 +1044,13 @@ let apply_renaming_unary_primitive p renaming =
       Alloc_mode.For_allocations.apply_renaming alloc_mode renaming
     in
     if alloc_mode == alloc_mode' then p else Box_number (kind, alloc_mode')
+  | End_region { free_names; } ->
+    End_region { free_names = Name_occurrences.apply_renaming free_names renaming; }
   | Duplicate_array _ | Duplicate_block _ | Is_int _ | Get_tag | String_length _
   | Int_as_pointer | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
   | Reinterpret_int64_as_float | Float_arith _ | Array_length
   | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
-  | Is_boxed_float | Is_flat_float_array | Begin_try_region | End_region
+  | Is_boxed_float | Is_flat_float_array | Begin_try_region
   | Project_function_slot _ | Project_value_slot _ | Obj_dup ->
     p
 
@@ -1056,11 +1058,13 @@ let ids_for_export_unary_primitive p =
   match p with
   | Box_number (_kind, alloc_mode) ->
     Alloc_mode.For_allocations.ids_for_export alloc_mode
+  | End_region { free_names; } ->
+    Name_occurrences.ids_for_export free_names
   | Duplicate_array _ | Duplicate_block _ | Is_int _ | Get_tag | String_length _
   | Int_as_pointer | Opaque_identity _ | Int_arith _ | Num_conv _ | Boolean_not
   | Reinterpret_int64_as_float | Float_arith _ | Array_length
   | Bigarray_length _ | Unbox_number _ | Untag_immediate | Tag_immediate
-  | Is_boxed_float | Is_flat_float_array | Begin_try_region | End_region
+  | Is_boxed_float | Is_flat_float_array | Begin_try_region
   | Project_function_slot _ | Project_value_slot _ | Obj_dup ->
     Ids_for_export.empty
 
@@ -1988,13 +1992,13 @@ end
 
 let is_begin_or_end_region t =
   match t with
-  | Nullary Begin_region | Unary ((Begin_try_region | End_region), _) -> true
+  | Nullary Begin_region | Unary ((Begin_try_region | End_region _), _) -> true
   | _ -> false
   [@@ocaml.warning "-fragile-match"]
 
 let is_end_region t =
   match t with
-  | Unary (End_region, region) -> (
+  | Unary (End_region _, region) -> (
     match Simple.must_be_var region with
     | Some (region, _coercion) -> Some region
     | None ->

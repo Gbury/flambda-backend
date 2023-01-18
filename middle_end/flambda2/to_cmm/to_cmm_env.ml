@@ -869,7 +869,7 @@ end)
 type flush_mode =
   | Entering_loop
   | Branching_point
-  | Flush_everything
+  | Flush_everything of { free_names : Name_occurrences.t; }
 
 let flush_delayed_lets ~mode env res =
   (* Generate a wrapper function to introduce the delayed let-bindings. *)

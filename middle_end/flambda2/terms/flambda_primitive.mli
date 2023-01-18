@@ -293,7 +293,7 @@ type unary_primitive =
   | Begin_try_region
       (** Starting delimiter of local allocation region, when used for a "try"
           body, accepting the parent region as argument. *)
-  | End_region
+  | End_region of { free_names : Name_occurrences.t; }
       (** Ending delimiter of local allocation region, accepting a region name. *)
   | Obj_dup  (** Corresponds to [Obj.dup]; see the documentation in obj.mli. *)
 

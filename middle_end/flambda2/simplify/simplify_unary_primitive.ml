@@ -597,7 +597,7 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | Duplicate_block { kind } -> simplify_duplicate_block ~kind
     | Opaque_identity { middle_end_only = _ } -> simplify_opaque_identity
     | Begin_try_region -> simplify_begin_try_region
-    | End_region -> simplify_end_region
+    | End_region { free_names = _; } -> simplify_end_region
     | Obj_dup -> simplify_obj_dup dbg
   in
   simplifier dacc ~original_term ~arg ~arg_ty ~result_var

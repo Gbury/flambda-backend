@@ -366,7 +366,7 @@ and let_expr0 env res let_expr (bound_pattern : Bound_pattern.t)
     when (not (Flambda_features.stack_allocation_enabled ()))
          && Flambda_primitive.is_begin_or_end_region p ->
     expr env res body
-  | Singleton v, Prim ((Unary (End_region, _) as p), dbg) ->
+  | Singleton v, Prim ((Unary (End_region _, _) as p), dbg) ->
     (* CR gbury: this is a hack to prevent moving of expressions past an
        End_region. We have to do this manually because we currently have effects
        and coeffects that are not precise enough. Particularly, an immutable

@@ -619,7 +619,7 @@ let unary_primitive env res dbg f arg =
   | Is_flat_float_array ->
     None, res, C.eq ~dbg (C.get_tag arg dbg) (C.floatarray_tag dbg)
   | Begin_try_region -> None, res, C.beginregion ~dbg
-  | End_region -> None, res, C.return_unit dbg (C.endregion ~dbg arg)
+  | End_region _ -> None, res, C.return_unit dbg (C.endregion ~dbg arg)
 
 let binary_primitive env dbg f x y =
   match (f : P.binary_primitive) with
