@@ -43,7 +43,7 @@ let rec static_block_updates symb env res acc i = function
     | Symbol _ | Tagged_immediate _ ->
       static_block_updates symb env res acc (i + 1) r
     | Dynamically_computed (var, dbg) ->
-      let env, res, acc =
+      let env, res, _free_names, acc =
         C.make_update env res dbg Word_val ~symbol:(C.symbol ~dbg symb) var
           ~index:i ~prev_updates:acc
       in
@@ -55,7 +55,7 @@ let rec static_float_array_updates symb env res acc i = function
     match (sv : _ Or_variable.t) with
     | Const _ -> static_float_array_updates symb env res acc (i + 1) r
     | Var (var, dbg) ->
-      let env, res, acc =
+      let env, res, _free_names, acc =
         C.make_update env res dbg Double ~symbol:(C.symbol ~dbg symb) var
           ~index:i ~prev_updates:acc
       in
@@ -79,8 +79,10 @@ let static_boxed_number ~kind ~env ~symbol ~default ~emit ~transl ~structured v
       Cmmgen_state.add_structured_constant symbol_name structured_constant;
       env, res, None
     | Var (v, dbg) ->
+      let env, res, _free_names, updates =
       C.make_update env res dbg kind ~symbol:(C.symbol ~dbg symbol) v ~index:0
-        ~prev_updates:updates
+        ~prev_updates:updates in
+      env, res, updates
   in
   R.update_data res (or_variable aux default v), env, updates
 
