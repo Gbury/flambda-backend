@@ -920,6 +920,8 @@ end
 
 module Continuation_handler_with_acc = struct
   let create acc parameters ~handler ~is_exn_handler =
+    (* TODO: FIXME / CR Keryan-dev *)
+    let params_info = Variable.Map.empty in
     let free_names_of_handler = Or_unknown.Known (Acc.free_names acc) in
     let acc =
       List.fold_left
@@ -930,7 +932,7 @@ module Continuation_handler_with_acc = struct
     in
     ( acc,
       Continuation_handler.create parameters ~handler ~free_names_of_handler
-        ~is_exn_handler )
+        ~params_info ~is_exn_handler )
 end
 
 module Let_cont_with_acc = struct

@@ -43,14 +43,21 @@ open! Simplify_import
 
 (* For each stage, the information received by this stage is of type
    stage_data. *)
+type original_rec_cont =
+  { params : Bound_parameters.t;
+    params_info : Variable_info.t Variable.Map.t;
+    handler : Expr.t
+  }
+
 type original_handlers =
   | Recursive of
       { invariant_params : Bound_parameters.t;
-        continuation_handlers : (Bound_parameters.t * Expr.t) Continuation.Map.t
+        continuation_handlers : original_rec_cont Continuation.Map.t
       }
   | Non_recursive of
       { cont : Continuation.t;
         params : Bound_parameters.t;
+        params_info : Variable_info.t Variable.Map.t;
         handler : Expr.t;
         is_exn_handler : bool
       }
@@ -70,6 +77,7 @@ type expr_to_rebuild = (Rebuilt_expr.t * Upwards_acc.t) Simplify_common.rebuild
 
 type handler_after_downwards_traversal =
   { params : Bound_parameters.t;
+    params_info : Variable_info.t Variable.Map.t;
     rebuild_handler : expr_to_rebuild;
     is_exn_handler : bool;
     (* continuations_used is the set of which continuations from this block of
@@ -91,6 +99,7 @@ type after_downwards_traversal_of_body_and_handlers_data =
 
 type handler_to_rebuild =
   { params : Bound_parameters.t;
+    params_info : Variable_info.t Variable.Map.t;
     rebuild_handler : expr_to_rebuild;
     is_exn_handler : bool;
     extra_params_and_args : EPA.t;
@@ -148,6 +157,19 @@ type rebuild_let_cont_data =
     cost_metrics_of_subsequent_exprs : Cost_metrics.t;
     uenv_of_subsequent_exprs : UE.t
   }
+
+let filter_params_info ~invariant_params ~variant_params params_info =
+  if Variable.Map.is_empty params_info
+  then params_info
+  else
+    let new_params =
+      Variable.Set.union
+        (Bound_parameters.var_set variant_params)
+        (Bound_parameters.var_set invariant_params)
+    in
+    Variable.Map.filter
+      (fun var _ -> Variable.Set.mem var new_params)
+      params_info
 
 let decide_param_usage_non_recursive ~free_names ~required_names
     ~removed_aliased ~exn_bucket param : Apply_cont_rewrite.used =
@@ -520,6 +542,7 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
   let { is_exn_handler;
         rewrite_ids;
         params;
+        params_info;
         rebuild_handler;
         extra_params_and_args;
         invariant_extra_params_and_args
@@ -561,6 +584,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
       let invariant_params, params =
         Apply_cont_rewrite.get_used_params rewrite
       in
+      let params_info =
+        filter_params_info ~invariant_params ~variant_params:params params_info
+      in
       if not (Bound_parameters.is_empty invariant_params)
       then
         Misc.fatal_errorf "Non-recursive continuation has invariant params: %a"
@@ -577,7 +603,8 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
-          params ~handler ~free_names_of_handler:free_names ~is_exn_handler
+          params ~params_info ~handler ~free_names_of_handler:free_names
+          ~is_exn_handler
       in
       let uacc =
         UA.map_uenv uacc ~f:(fun uenv ->
@@ -679,10 +706,14 @@ let rebuild_single_recursive_handler cont
       let invariant_params, variant_params =
         Apply_cont_rewrite.get_used_params rewrite
       in
+      let params_info =
+        filter_params_info ~invariant_params ~variant_params
+          handler_to_rebuild.params_info
+      in
       let cont_handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
-          variant_params ~handler ~free_names_of_handler:free_names
+          variant_params ~handler ~free_names_of_handler:free_names ~params_info
           ~is_exn_handler:false
       in
       let free_names =
@@ -859,6 +890,7 @@ let create_handler_to_rebuild
       handler.extra_params_and_args_for_cse
   in
   { params = handler.params;
+    params_info = handler.params_info;
     rebuild_handler = handler.rebuild_handler;
     is_exn_handler = handler.is_exn_handler;
     extra_params_and_args;
@@ -1040,7 +1072,7 @@ let simplify_handler ~simplify_expr ~is_recursive ~is_exn_handler
 
 let simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
     ~invariant_params consts_lifted_during_body all_handlers_set denv_to_reset
-    dacc cont (params, handler) k =
+    dacc cont { params; params_info; handler } k =
   (* Here we perform the downwards traversal on a single handler.
 
      We also make unboxing decisions at this step, which are necessary to
@@ -1079,6 +1111,7 @@ let simplify_single_recursive_handler ~simplify_expr cont_uses_env_so_far
       in
       k dacc
         { params;
+          params_info;
           rebuild_handler;
           is_exn_handler = false;
           continuations_used;
@@ -1157,7 +1190,7 @@ let after_downwards_traversal_of_body ~simplify_expr
     DA.add_to_lifted_constant_accumulator dacc data.prior_lifted_constants
   in
   match data.handlers with
-  | Non_recursive { cont; params; handler; is_exn_handler } -> (
+  | Non_recursive { cont; params; params_info; handler; is_exn_handler } -> (
     match
       Continuation_uses_env.get_continuation_uses body_continuation_uses_env
         cont
@@ -1207,6 +1240,7 @@ let after_downwards_traversal_of_body ~simplify_expr
           let continuations_used = Continuation.Set.empty in
           let rebuild =
             { params;
+              params_info;
               rebuild_handler;
               is_exn_handler;
               continuations_used;
@@ -1299,12 +1333,18 @@ let simplify_let_cont ~simplify_expr dacc (let_cont : Let_cont.t) ~down_to_up =
       in
       let cont_handler = Non_recursive_let_cont_handler.handler handler in
       let is_exn_handler = CH.is_exn_handler cont_handler in
-      let params, handler =
-        CH.pattern_match cont_handler ~f:(fun params ~handler ->
-            params, handler)
+      let params, params_info, handler =
+        CH.pattern_match' cont_handler
+          ~f:(fun
+               params
+               ~num_normal_occurrences_of_params:_
+               ~params_info
+               ~handler
+             -> params, params_info, handler)
       in
       { body;
-        handlers = Non_recursive { cont; params; handler; is_exn_handler }
+        handlers =
+          Non_recursive { cont; params; params_info; handler; is_exn_handler }
       }
     | Recursive handlers ->
       let invariant_params, body, rec_handlers =
@@ -1317,7 +1357,13 @@ let simplify_let_cont ~simplify_expr dacc (let_cont : Let_cont.t) ~down_to_up =
       let continuation_handlers =
         Continuation.Map.map
           (fun handler ->
-            CH.pattern_match handler ~f:(fun params ~handler -> params, handler))
+            CH.pattern_match' handler
+              ~f:(fun
+                   params
+                   ~num_normal_occurrences_of_params:_
+                   ~params_info
+                   ~handler
+                 -> { params; params_info; handler }))
           handlers
       in
       { body; handlers = Recursive { invariant_params; continuation_handlers } }
@@ -1333,7 +1379,13 @@ let simplify_as_recursive_let_cont ~simplify_expr dacc (body, handlers)
   let continuation_handlers =
     Continuation.Map.map
       (fun handler ->
-        CH.pattern_match handler ~f:(fun params ~handler -> params, handler))
+        CH.pattern_match' handler
+          ~f:(fun
+               params
+               ~num_normal_occurrences_of_params:_
+               ~params_info
+               ~handler
+             -> { params; params_info; handler }))
       handlers
   in
   let data : simplify_let_cont_data =

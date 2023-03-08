@@ -514,7 +514,14 @@ and let_cont env res (let_cont : Flambda.Let_cont.t) =
 (* The bound continuation [k] will be inlined. *)
 and let_cont_inlined env res k handler body =
   Continuation_handler.pattern_match' handler
-    ~f:(fun handler_params ~num_normal_occurrences_of_params ~handler ->
+    ~f:(fun
+         handler_params
+         ~num_normal_occurrences_of_params
+         ~params_info
+         ~handler
+       ->
+      (* TODO: use params_info *)
+      ignore params_info;
       let env =
         Env.add_inline_cont env k ~handler_params
           ~handler_params_occurrences:num_normal_occurrences_of_params
@@ -636,7 +643,14 @@ and let_cont_rec env res invariant_params conts body =
       (fun k handler acc ->
         let continuation_arg_tys =
           Continuation_handler.pattern_match' handler
-            ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler:_ ->
+            ~f:(fun
+                 params
+                 ~num_normal_occurrences_of_params:_
+                 ~params_info
+                 ~handler:_
+               ->
+              (* TODO: use params_info *)
+              ignore params_info;
               List.map C.machtype_of_kinded_parameter
                 (Bound_parameters.to_list
                    (Bound_parameters.append invariant_params params)))
@@ -680,7 +694,9 @@ and let_cont_rec env res invariant_params conts body =
 
 and continuation_handler env res handler =
   Continuation_handler.pattern_match' handler
-    ~f:(fun params ~num_normal_occurrences_of_params:_ ~handler ->
+    ~f:(fun params ~num_normal_occurrences_of_params:_ ~params_info ~handler ->
+      (* TODO: use params_info *)
+      ignore params_info;
       let arity = Bound_parameters.arity params in
       let env, vars = C.bound_parameters env params in
       let expr, free_vars_of_handler, res = expr env res handler in

@@ -92,6 +92,7 @@ module Continuation_handler : sig
     Bound_parameters.t ->
     handler:rebuilt_expr ->
     free_names_of_handler:Name_occurrences.t ->
+    params_info:Variable_info.t Variable.Map.t ->
     is_exn_handler:bool ->
     t
 
@@ -99,6 +100,7 @@ module Continuation_handler : sig
     Are_rebuilding_terms.t ->
     Bound_parameters.t ->
     handler:rebuilt_expr ->
+    params_info:Variable_info.t Variable.Map.t ->
     is_exn_handler:bool ->
     t
 end

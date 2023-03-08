@@ -74,7 +74,8 @@ let wrap_inlined_body_for_exn_extra_args ~extra_args ~apply_exn_continuation
   let let_cont_create () cont ~handler_params ~handler ~body ~is_exn_handler =
     let handler =
       Continuation_handler.create handler_params ~handler:(handler ())
-        ~free_names_of_handler:Unknown ~is_exn_handler
+        ~free_names_of_handler:Unknown ~params_info:Variable.Map.empty
+        ~is_exn_handler
     in
     Let_cont.create_non_recursive cont handler ~body:(body ())
       ~free_names_of_body:Unknown

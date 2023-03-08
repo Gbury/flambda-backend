@@ -271,6 +271,7 @@ module Continuation_handler : sig
   val create :
     Bound_parameters.t ->
     handler:expr ->
+    params_info:Variable_info.t Variable.Map.t ->
     free_names_of_handler:Name_occurrences.t Or_unknown.t ->
     is_exn_handler:bool ->
     t
@@ -282,6 +283,7 @@ module Continuation_handler : sig
     f:
       (Bound_parameters.t ->
       num_normal_occurrences_of_params:Num_occurrences.t Variable.Map.t ->
+      params_info:Variable_info.t Variable.Map.t ->
       handler:expr ->
       'a) ->
     'a

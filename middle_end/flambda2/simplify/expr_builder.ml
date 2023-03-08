@@ -721,11 +721,12 @@ let rewrite_fixed_arity_continuation0 uacc cont_or_apply_cont ~use_id arity :
   | Some rewrite -> (
     let new_wrapper params expr ~free_names
         ~cost_metrics:cost_metrics_of_handler =
+      let params_info = Variable.Map.empty in
       let cont = Continuation.create () in
       let handler =
         RE.Continuation_handler.create
           (UA.are_rebuilding_terms uacc)
-          params ~handler:expr ~free_names_of_handler:free_names
+          params ~handler:expr ~free_names_of_handler:free_names ~params_info
           ~is_exn_handler:false
       in
       let free_names_of_handler =

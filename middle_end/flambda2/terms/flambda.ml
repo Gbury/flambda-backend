@@ -106,6 +106,7 @@ and recursive_let_cont_handlers =
 
 and continuation_handler_t0 =
   { num_normal_occurrences_of_params : Num_occurrences.t Variable.Map.t;
+    params_info : Variable_info.t Variable.Map.t;
     handler : expr
   }
 
@@ -247,8 +248,17 @@ and apply_renaming_recursive_let_cont_handlers t renaming =
     ~apply_renaming_to_term:apply_renaming_recursive_let_cont_handlers_t0
 
 and apply_renaming_continuation_handler_t0
-    ({ handler; num_normal_occurrences_of_params } as t) renaming =
+    ({ handler; params_info; num_normal_occurrences_of_params } as t) renaming =
   let handler' = apply_renaming handler renaming in
+  let params_info', is_identity_params_info =
+    Variable.Map.fold
+      (fun var info (new_params_info, is_identity) ->
+        let var' = Renaming.apply_variable renaming var in
+        let info' = Variable_info.apply_renaming info renaming in
+        let is_identity = is_identity && var == var' && info == info' in
+        Variable.Map.add var' info' new_params_info, is_identity)
+      params_info (Variable.Map.empty, true)
+  in
   let num_normal_occurrences_of_params', is_identity_num_occurrences =
     Variable.Map.fold
       (fun var num (all_occurrences, is_identity) ->
@@ -257,9 +267,11 @@ and apply_renaming_continuation_handler_t0
       num_normal_occurrences_of_params (Variable.Map.empty, true)
   in
   if handler == handler' && is_identity_num_occurrences
+     && is_identity_params_info
   then t
   else
     { handler = handler';
+      params_info = params_info';
       num_normal_occurrences_of_params = num_normal_occurrences_of_params'
     }
 
@@ -330,9 +342,16 @@ and apply_renaming_static_const_group t renaming =
       apply_renaming_static_const_or_code static_const renaming)
     t
 
+let ids_for_export_params_info params_info =
+  Variable.Map.fold
+    (fun _var info ids_for_export ->
+      Ids_for_export.union ids_for_export (Variable_info.ids_for_export info))
+    params_info Ids_for_export.empty
+
 let rec ids_for_export_continuation_handler_t0
-    { handler; num_normal_occurrences_of_params = _ } =
-  ids_for_export handler
+    { handler; params_info; num_normal_occurrences_of_params = _ } =
+  Ids_for_export.union (ids_for_export handler)
+    (ids_for_export_params_info params_info)
 
 and ids_for_export_continuation_handler
     { cont_handler_abst; is_exn_handler = _ } =
@@ -886,8 +905,8 @@ module Continuation_handler = struct
 
   module A = Name_abstraction.Make (Bound_parameters) (T0)
 
-  let create params ~handler ~(free_names_of_handler : _ Or_unknown.t)
-      ~is_exn_handler =
+  let create params ~handler ~params_info
+      ~(free_names_of_handler : _ Or_unknown.t) ~is_exn_handler =
     Bound_parameters.check_no_duplicates params;
     let num_normal_occurrences_of_params =
       match free_names_of_handler with
@@ -902,7 +921,9 @@ module Continuation_handler = struct
             in
             Variable.Map.add var num num_occurrences)
     in
-    let t0 : T0.t = { num_normal_occurrences_of_params; handler } in
+    let t0 : T0.t =
+      { num_normal_occurrences_of_params; params_info; handler }
+    in
     let cont_handler_abst = A.create params t0 in
     { cont_handler_abst; is_exn_handler }
 
@@ -913,8 +934,8 @@ module Continuation_handler = struct
 
   let pattern_match' t ~f =
     A.pattern_match t.cont_handler_abst
-      ~f:(fun params { handler; num_normal_occurrences_of_params } ->
-        f params ~num_normal_occurrences_of_params ~handler)
+      ~f:(fun params { handler; params_info; num_normal_occurrences_of_params }
+         -> f params ~num_normal_occurrences_of_params ~params_info ~handler)
 
   module Pattern_match_pair_error = struct
     type t = Parameter_lists_have_different_lengths
