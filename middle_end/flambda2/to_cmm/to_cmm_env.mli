@@ -275,13 +275,20 @@ val extra_info : t -> Simple.t -> extra_info option
 
 (** {2 Continuation bindings} *)
 
+(** Transofrmation applied to continuation parameters when the continuation
+    is a jump to a Cmm continuation. *)
+type arg_transform =
+  | Identity
+  | Unbox_number of Flambda_kind.Boxable_number.t
+
 (** Translation information for continuations. A continuation may either be
     translated as a static jump to a Cmm continuation (represented as a Cmm
     label), or inlined at any unique use site. *)
 type cont = private
   | Jump of
       { cont : Cmm.label;
-        param_types : Cmm.machtype list
+        param_types : Cmm.machtype list;
+        arg_transforms : arg_transform list
       }
   | Inline of
       { handler_params : Bound_parameters.t;
@@ -292,7 +299,11 @@ type cont = private
 (** Record that the given continuation should be compiled to a jump, creating a
     fresh Cmm continuation identifier for it. *)
 val add_jump_cont :
-  t -> Continuation.t -> param_types:Cmm.machtype list -> Cmm.label * t
+  t ->
+  Continuation.t ->
+  param_types:Cmm.machtype list ->
+  arg_transforms:arg_transform list ->
+  Cmm.label * t
 
 (** Record that the given continuation should be inlined. *)
 val add_inline_cont :

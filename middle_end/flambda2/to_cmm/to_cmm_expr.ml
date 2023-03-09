@@ -56,6 +56,65 @@ let bind_var_to_simple ~dbg env res v ~num_normal_occurrences_of_bound_vars s =
     in
     env, res
 
+(* Helpers for the translation of [Apply_cont] expressions. *)
+
+let apply_arg_transforms args transforms =
+  List.map2
+    (fun arg transform ->
+      match (transform : Env.arg_transform) with
+      | Identity -> arg
+      | Unbox_number kind ->
+        To_cmm_primitive.unbox_number ~dbg:Debuginfo.none kind arg)
+    args transforms
+
+(* Helpers for [Let_cont] *)
+
+let transforms_of_params_info params_info params =
+  List.map
+    (fun param ->
+      match Variable.Map.find (Bound_parameter.var param) params_info with
+      | Variable_info.Classic_unbox_number_in_cmm kind -> Env.Unbox_number kind
+      | exception Not_found -> Env.Identity)
+    params
+
+let create_continuation_parameters env res params_info params =
+  let env, res, rev_vars, rev_transforms =
+    List.fold_left
+      (fun (env, res, rev_vars, rev_transforms) param ->
+        let flambda_var = Bound_parameter.var param in
+        match Variable.Map.find flambda_var params_info with
+        | Variable_info.Classic_unbox_number_in_cmm kind ->
+          let unboxed_var = Variable.rename flambda_var in
+          let env, var = Env.create_bound_parameter env unboxed_var in
+          let ty =
+            C.machtype_of_kind (Flambda_kind.Boxable_number.unboxed_kind kind)
+          in
+          let prim =
+            Flambda_primitive.(
+              Unary
+                ( Box_number (kind, Alloc_mode.For_allocations.heap),
+                  Simple.var unboxed_var ))
+          in
+          let defining_expr, env, res, effects_and_coeffects_of_defining_expr =
+            To_cmm_primitive.prim_complex env res Debuginfo.none prim
+          in
+          let env, res =
+            Env.bind_variable_to_primitive env res flambda_var
+              ~inline:Must_inline_and_duplicate ~defining_expr
+              ~effects_and_coeffects_of_defining_expr
+          in
+          ( env,
+            res,
+            (var, ty) :: rev_vars,
+            Env.Unbox_number kind :: rev_transforms )
+        | exception Not_found ->
+          let env, var = Env.create_bound_parameter env flambda_var in
+          let ty = C.machtype_of_kinded_parameter param in
+          env, res, (var, ty) :: rev_vars, Env.Identity :: rev_transforms)
+      (env, res, [], []) params
+  in
+  env, res, List.rev rev_vars, List.rev rev_transforms
+
 (* Helpers for the translation of [Apply] expressions. *)
 
 let translate_apply0 env res apply =
@@ -299,7 +358,7 @@ let translate_raise env res apply exn_handler args =
     Misc.fatal_errorf "Exception continuation %a has no arguments:@ \n%a"
       Continuation.print exn_handler Apply_cont.print apply
 
-let translate_jump_to_continuation env res apply types cont args =
+let translate_jump_to_continuation env res apply types transforms cont args =
   if List.compare_lengths types args = 0
   then
     let trap_actions =
@@ -312,6 +371,7 @@ let translate_jump_to_continuation env res apply types cont args =
     in
     let dbg = Apply_cont.debuginfo apply in
     let args, free_vars, env, res, _ = C.simple_list ~dbg env res args in
+    let args = apply_arg_transforms args transforms in
     let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
     let cmm, free_vars = wrap (C.cexit cont args trap_actions) free_vars in
     cmm, free_vars, res
@@ -520,8 +580,15 @@ and let_cont_inlined env res k handler body =
          ~params_info
          ~handler
        ->
-      (* TODO: use params_info *)
-      ignore params_info;
+      Variable.Map.iter
+        (fun _var info ->
+          match (info : Variable_info.t) with
+          | Classic_unbox_number_in_cmm _ ->
+            (* When a continuation is inlined, we already propagate the boxing
+               operation as much as possible, so there is nothing more we can do
+               to emulate the closure way of unboxing. *)
+            ())
+        params_info;
       let env =
         Env.add_inline_cont env k ~handler_params
           ~handler_params_occurrences:num_normal_occurrences_of_params
@@ -537,11 +604,11 @@ and let_cont_not_inlined env res k handler body =
      expression. *)
   let wrap, env, res = Env.flush_delayed_lets ~mode:Branching_point env res in
   let is_exn_handler = Continuation_handler.is_exn_handler handler in
-  let vars, arity, handler, free_vars_of_handler, res =
+  let vars, arg_transforms, arity, handler, free_vars_of_handler, res =
     continuation_handler env res handler
   in
   let catch_id, env =
-    Env.add_jump_cont env k ~param_types:(List.map snd vars)
+    Env.add_jump_cont env k ~param_types:(List.map snd vars) ~arg_transforms
   in
   let cmm, free_vars, res =
     (* Exception continuations are translated specially -- these will be reached
@@ -641,7 +708,7 @@ and let_cont_rec env res invariant_params conts body =
   let env =
     Continuation.Map.fold
       (fun k handler acc ->
-        let continuation_arg_tys =
+        let continuation_arg_tys, arg_transforms =
           Continuation_handler.pattern_match' handler
             ~f:(fun
                  params
@@ -649,13 +716,21 @@ and let_cont_rec env res invariant_params conts body =
                  ~params_info
                  ~handler:_
                ->
-              (* TODO: use params_info *)
-              ignore params_info;
-              List.map C.machtype_of_kinded_parameter
-                (Bound_parameters.to_list
-                   (Bound_parameters.append invariant_params params)))
+              let param_list =
+                Bound_parameters.to_list
+                  (Bound_parameters.append invariant_params params)
+              in
+              let machtypes =
+                List.map C.machtype_of_kinded_parameter param_list
+              in
+              let transforms =
+                transforms_of_params_info params_info param_list
+              in
+              machtypes, transforms)
         in
-        snd (Env.add_jump_cont acc k ~param_types:continuation_arg_tys))
+        snd
+          (Env.add_jump_cont acc k ~arg_transforms
+             ~param_types:continuation_arg_tys))
       conts_to_handlers env
   in
   (* Generate variables for the invariant params *)
@@ -664,7 +739,7 @@ and let_cont_rec env res invariant_params conts body =
   let conts_to_handlers, res =
     Continuation.Map.fold
       (fun k handler (conts_to_handlers, res) ->
-        let vars, _arity, handler, free_vars_of_handler, res =
+        let vars, _transforms, _arity, handler, free_vars_of_handler, res =
           continuation_handler env res handler
         in
         ( Continuation.Map.add k
@@ -695,12 +770,13 @@ and let_cont_rec env res invariant_params conts body =
 and continuation_handler env res handler =
   Continuation_handler.pattern_match' handler
     ~f:(fun params ~num_normal_occurrences_of_params:_ ~params_info ~handler ->
-      (* TODO: use params_info *)
-      ignore params_info;
       let arity = Bound_parameters.arity params in
-      let env, vars = C.bound_parameters env params in
+      let params = Bound_parameters.to_list params in
+      let env, res, vars, transforms =
+        create_continuation_parameters env res params_info params
+      in
       let expr, free_vars_of_handler, res = expr env res handler in
-      vars, arity, expr, free_vars_of_handler, res)
+      vars, transforms, arity, expr, free_vars_of_handler, res)
 
 and apply_expr env res apply =
   let call, free_vars, env, res, effs = translate_apply env res apply in
@@ -745,11 +821,12 @@ and apply_expr env res apply =
         Continuation.print k Apply.print apply
     in
     match Env.get_continuation env k with
-    | Jump { param_types = []; cont = _ } -> unsupported ()
-    | Jump { param_types = [_]; cont } ->
+    | Jump { param_types = []; arg_transforms = _; cont = _ } -> unsupported ()
+    | Jump { param_types = [_]; arg_transforms; cont } ->
       (* Case 2 *)
       let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
-      let cmm, free_vars = wrap (C.cexit cont [call] []) free_vars in
+      let args = apply_arg_transforms [call] arg_transforms in
+      let cmm, free_vars = wrap (C.cexit cont args []) free_vars in
       cmm, free_vars, res
     | Inline { handler_params; handler_body = body; handler_params_occurrences }
       -> (
@@ -778,8 +855,9 @@ and apply_cont env res apply_cont =
   then translate_jump_to_return_continuation env res apply_cont k args
   else
     match Env.get_continuation env k with
-    | Jump { param_types; cont } ->
-      translate_jump_to_continuation env res apply_cont param_types cont args
+    | Jump { param_types; arg_transforms; cont } ->
+      translate_jump_to_continuation env res apply_cont param_types
+        arg_transforms cont args
     | Inline { handler_params; handler_body; handler_params_occurrences } ->
       if Option.is_some (Apply_cont.trap_action apply_cont)
       then

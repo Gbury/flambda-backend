@@ -92,6 +92,7 @@ let unit0 ~offsets flambda_unit ~all_code =
     Env.add_jump_cont env
       (Flambda_unit.return_continuation flambda_unit)
       ~param_types:(List.map snd return_cont_params)
+      ~arg_transforms:(List.map (fun _ -> Env.Identity) return_cont_params)
   in
   (* See comment in [To_cmm_set_of_closures] about binding [my_region] *)
   let env, toplevel_region_var =

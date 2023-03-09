@@ -26,10 +26,15 @@ type expr_with_info =
     free_vars : free_vars
   }
 
+type arg_transform =
+  | Identity
+  | Unbox_number of Flambda_kind.Boxable_number.t
+
 type cont =
   | Jump of
       { cont : Cmm.label;
-        param_types : Cmm.machtype list
+        param_types : Cmm.machtype list;
+        arg_transforms : arg_transform list
       }
   | Inline of
       { handler_params : Bound_parameters.t;
@@ -319,9 +324,13 @@ let get_continuation env k =
 
 let new_cmm_continuation = Lambda.next_raise_count
 
-let add_jump_cont env k ~param_types =
+let add_jump_cont env k ~param_types ~arg_transforms =
   let cont = new_cmm_continuation () in
-  let conts = Continuation.Map.add k (Jump { param_types; cont }) env.conts in
+  let conts =
+    Continuation.Map.add k
+      (Jump { param_types; arg_transforms; cont })
+      env.conts
+  in
   cont, { env with conts }
 
 let add_inline_cont env k ~handler_params ~handler_params_occurrences

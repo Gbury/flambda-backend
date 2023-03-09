@@ -36,3 +36,18 @@ val prim_complex :
   * To_cmm_env.t
   * To_cmm_result.t
   * Effects_and_coeffects.t
+
+(* Some helper functions *)
+
+val box_number :
+  dbg:Debuginfo.t ->
+  Flambda_kind.Boxable_number.t ->
+  Alloc_mode.For_allocations.t ->
+  Cmm.expression ->
+  Cmm.expression
+
+val unbox_number :
+  dbg:Debuginfo.t ->
+  Flambda_kind.Boxable_number.t ->
+  Cmm.expression ->
+  Cmm.expression
