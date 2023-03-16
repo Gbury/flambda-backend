@@ -22,6 +22,8 @@ type t = private
     dacc : Downwards_acc.t
   }
 
+val print : Format.formatter -> t -> unit
+
 val create : Flambda.Named.t -> try_reify:bool -> Downwards_acc.t -> t
 
 val create_simplified :

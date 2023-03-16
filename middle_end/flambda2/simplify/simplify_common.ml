@@ -16,6 +16,11 @@
 
 open Simplify_import
 
+let debug () =
+  match Sys.getenv "DEBUG" with
+  | exception Not_found -> false
+  | _ -> true
+
 type 'a after_rebuild = Rebuilt_expr.t -> Upwards_acc.t -> 'a
 
 type 'a rebuild = Upwards_acc.t -> after_rebuild:'a after_rebuild -> 'a
@@ -56,6 +61,9 @@ let simplify_projection dacc ~original_term ~deconstructing ~shape ~result_var
     let dacc = DA.add_variable dacc result_var (T.bottom result_kind) in
     Simplify_primitive_result.create_invalid dacc
   | Ok env_extension ->
+    if debug () then
+      Format.eprintf "simplify_projection:@\nenv: %a@\nenv_extension: %a@."
+        T.Typing_env.print env T.Typing_env_extension.print env_extension;
     let dacc =
       DA.map_denv dacc ~f:(fun denv ->
           DE.define_variable_and_extend_typing_environment denv result_var

@@ -17,6 +17,11 @@
 open! Simplify_import
 module U = Unboxing_types
 
+let debug () =
+  match Sys.getenv "DEBUG" with
+  | exception Not_found -> false
+  | _ -> true
+
 let add_equation_on_var denv var shape =
   let kind = T.kind shape in
   let var_type = T.alias_type_of kind (Simple.var var) in
@@ -76,7 +81,12 @@ let rec denv_of_decision denv ~param_var (decision : U.decision) : DE.t =
       T.closure_with_at_least_these_value_slots
         ~this_function_slot:function_slot map
     in
+    if debug () then
+      Format.eprintf "+++ Unbox_denv +++@\nparam_var: %a@\nshape: %a@."
+        Variable.print param_var T.print shape;
     let denv = add_equation_on_var denv param_var shape in
+    if debug () then
+      Format.eprintf "after meet: %a@." TE.print (DE.typing_env denv);
     Value_slot.Map.fold
       (fun _ (field : U.field_decision) denv ->
         denv_of_decision denv ~param_var:field.epa.param field.decision)

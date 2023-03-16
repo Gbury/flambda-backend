@@ -19,6 +19,11 @@ module MTC = More_type_creators
 module TG = Type_grammar
 module TEL = Typing_env_level
 
+let debug () =
+  match Sys.getenv "DEBUG" with
+  | exception Not_found -> false
+  | _ -> true
+
 module One_level : sig
   type t
 
@@ -145,11 +150,14 @@ let [@ocamlformat "disable"] print ppf
       "@[<hov 1>(\
          @[<hov 1>(defined_symbols@ %a)@]@ \
          @[<hov 1>(code_age_relation@ %a)@]@ \
+         @[<hov 1>(names_to_types@ %a)@]@ \
          @[<hov 1>(levels@ %a)@]@ \
          @[<hov 1>(aliases@ %a)@]\
        )@]"
       Symbol.Set.print defined_symbols
       Code_age_relation.print code_age_relation
+      (Name.Map.print (fun ppf (ty, _bt_and_mode) -> TG.print ppf ty))
+      (Cached_level.names_to_types (One_level.just_after_level t.current_level))
       (Format.pp_print_list ~pp_sep:Format.pp_print_space
          (One_level.print ~min_binding_time))
       levels
@@ -783,6 +791,8 @@ and add_equation1 t name ty ~(meet_type : meet_type) =
               "Directly recursive equation@ %a = %a@ disallowed:@ %a" Name.print
               name TG.print ty print t)
         ~const:(fun _ -> ()));
+  if debug () then
+    Format.eprintf "((( add_equation1 )))@\nname: %a@\nty: %a@." Name.print name TG.print ty;
   let aliases = aliases t in
   let find_canonical name =
     Aliases.get_canonical_ignoring_name_mode aliases name
@@ -834,6 +844,9 @@ and add_equation1 t name ty ~(meet_type : meet_type) =
   match inputs with
   | None -> t
   | Some (simple, t, ty) ->
+    if debug () then
+      Format.eprintf "INPUT:@\nsimple: %a@\nty: %a@."
+        Simple.print simple TG.print ty;
     (* We have [(coerce <bare_lhs> <coercion>) : <ty>]. Thus [<bare_lhs> :
        (coerce <ty> <coercion>^-1)]. *)
     let bare_lhs = Simple.without_coercion simple in

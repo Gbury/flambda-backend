@@ -18,6 +18,11 @@ open! Simplify_import
 module TE = Flambda2_types.Typing_env
 module Alias_set = TE.Alias_set
 
+let debug () =
+  match Sys.getenv "DEBUG" with
+  | exception Not_found -> false
+  | _ -> true
+
 [@@@ocaml.warning "-37"]
 
 type mergeable_arms =
@@ -361,10 +366,17 @@ let rebuild_switch ~arms ~condition_dbg ~scrutinee ~scrutinee_ty
 
 let simplify_arm ~typing_env_at_use ~scrutinee_ty arm action (arms, dacc) =
   let shape = T.this_naked_immediate arm in
+  if debug () then
+    Format.eprintf "___ simplify switch ___@\nscrutinee_ty: %a@\narm: %a@."
+      T.print scrutinee_ty Targetint_31_63.print arm;
   match T.meet typing_env_at_use scrutinee_ty shape with
   | Bottom -> arms, dacc
   | Ok (_meet_ty, env_extension) ->
+    if debug ()  then
+      Format.eprintf "env_extension: %a@." TEE.print env_extension;
     let env_at_use = TE.add_env_extension typing_env_at_use env_extension in
+    if debug () then
+      Format.eprintf "env_at_use: %a@." TE.print env_at_use;
     let denv_at_use = DE.with_typing_env (DA.denv dacc) env_at_use in
     let args = AC.args action in
     let use_kind =

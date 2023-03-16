@@ -20,6 +20,11 @@ module Float = Numeric_types.Float_by_bit_pattern
 module Int32 = Numeric_types.Int32
 module Int64 = Numeric_types.Int64
 
+let debug () =
+  match Sys.getenv "DEBUG" with
+  | exception Not_found -> false
+  | _ -> true
+
 let simplify_project_function_slot ~move_from ~move_to ~min_name_mode dacc
     ~original_term ~arg:closure ~arg_ty:closure_ty ~result_var =
   match
@@ -45,6 +50,10 @@ let simplify_project_function_slot ~move_from ~move_to ~min_name_mode dacc
 
 let simplify_project_value_slot function_slot value_slot kind ~min_name_mode
     dacc ~original_term ~arg:closure ~arg_ty:closure_ty ~result_var =
+  if debug () then
+    Format.eprintf "--- simplify project value slot ---@\n\
+                    arg: %a@\narg_ty: %a@\nvalue_slot: %a@."
+    Simple.print closure T.print closure_ty Value_slot.print value_slot;
   let result =
     (* We try a faster method before falling back to [simplify_projection]. *)
     match
@@ -64,6 +73,7 @@ let simplify_project_value_slot function_slot value_slot kind ~min_name_mode
         then simple
         else T.get_alias_exn (S.simplify_simple dacc simple ~min_name_mode)
       in
+      if debug () then Format.eprintf "known_result: %a@." Simple.print simple;
       let dacc =
         DA.add_variable dacc result_var
           (T.alias_type_of (K.With_subkind.kind kind) simple)
@@ -79,6 +89,7 @@ let simplify_project_value_slot function_slot value_slot kind ~min_name_mode
                ~value_slot_var:(Bound_var.var result_var) ~value_slot_kind:kind)
           ~result_var ~result_kind:(K.With_subkind.kind kind)
       in
+      if debug () then Format.eprintf "need_meet: %a@." SPR.print result;
       let dacc = DA.add_use_of_value_slot result.dacc value_slot in
       SPR.with_dacc result dacc
   in

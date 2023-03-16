@@ -16,6 +16,11 @@
 
 open! Simplify_import
 
+let debug () =
+  match Sys.getenv "DEBUG" with
+  | exception Not_found -> false
+  | _ -> true
+
 (* CR-someday mshinwell: Unused value slots should be deleted prior to
    simplification of sets of closures, taking the used-var-in-closures set from
    the previous round. *)
@@ -480,8 +485,10 @@ let simplify_function context ~outer_dacc function_slot code_id
           Flambda_features.Expert.max_function_simplify_run ()
         in
         if should_resimplify && count < max_function_simplify_run
-        then run ~outer_dacc ~code:new_code (count + 1)
-        else
+        then (
+          if debug () then Format.eprintf "/// Re-simplification ///@\ntmp code: %a@\n@." Code.print new_code;
+          run ~outer_dacc ~code:new_code (count + 1)
+        ) else
           let outer_dacc = introduce_code outer_dacc code_id new_code_const in
           code_id, outer_dacc
     in

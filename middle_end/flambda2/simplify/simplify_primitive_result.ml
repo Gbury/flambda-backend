@@ -22,6 +22,13 @@ type t =
     dacc : Downwards_acc.t
   }
 
+let print ppf { simplified_named; try_reify; dacc = _; } =
+  Format.fprintf ppf "@[<hov 1>(\
+      @[<hov 1>(try_reify@ %b)@]@ \
+      @[<hov 1>(simplified_named@ %a)@]\
+    )@]"
+    try_reify (Or_invalid.print Simplified_named.print) simplified_named
+
 let create named ~try_reify dacc =
   { simplified_named = Ok (Simplified_named.create named); try_reify; dacc }
 
