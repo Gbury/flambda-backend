@@ -16,6 +16,11 @@
 
 open! Simplify_import
 
+let debug () =
+  match Sys.getenv "DEBUG" with
+  | exception Not_found -> false
+  | _ -> true
+
 (* High-level view of the workflow for simplification of let cont:
  *
  * +--------------------+           +--------------------+
@@ -1198,6 +1203,9 @@ let after_downwards_traversal_of_body ~simplify_expr
           (Continuation_uses.get_uses uses)
           ~arg_types_by_use_id:(Continuation_uses.get_arg_types_by_use_id uses)
       in
+      if debug () then
+        Format.eprintf "*** unbox decisions for %a ***@\n%a@."
+          Continuation.print cont Unbox_continuation_params.Decisions.print unbox_decisions;
       simplify_handler ~simplify_expr ~is_recursive:false ~is_exn_handler
         ~params cont dacc handler ~invariant_params:Bound_parameters.empty
         (fun dacc rebuild_handler cont_uses_env_in_handler ->

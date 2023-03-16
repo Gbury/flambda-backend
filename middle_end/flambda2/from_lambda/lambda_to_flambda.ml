@@ -24,6 +24,26 @@ module IR = Closure_conversion.IR
 module Expr_with_acc = Closure_conversion_aux.Expr_with_acc
 module Function_decl = Closure_conversion_aux.Function_decls.Function_decl
 
+module Continuation = struct
+
+  include Continuation
+
+  let r = ref 0
+
+  let create ?name ?sort () =
+    incr r;
+    let name =
+      match name with
+      | Some s ->
+        s
+      | None ->
+        let s = Format.asprintf "k%d" !r in
+        s
+    in
+    create ~name ?sort ()
+
+end
+
 module Env : sig
   type t
 

@@ -32,6 +32,26 @@ module K = Flambda_kind
 module P = Flambda_primitive
 module VB = Bound_var
 
+module Continuation = struct
+
+  include Continuation
+
+  let r = ref 0
+
+  let create ?name ?sort () =
+    incr r;
+    let name =
+      match name with
+      | Some s ->
+        s
+      | None ->
+        let s = Format.asprintf "k#%d" !r in
+        s
+    in
+    create ~name ?sort ()
+
+end
+
 type 'a close_program_metadata =
   | Normal : [`Normal] close_program_metadata
   | Classic :
