@@ -24,7 +24,7 @@ module R = To_cmm_result
 
 let static_value res v =
   match (v : Field_of_static_block.t) with
-  | Symbol s -> C.symbol_address (R.symbol res s)
+  | Symbol s -> C.symbol_address (R.symbol ~site:Use_site res s)
   | Dynamically_computed _ -> C.cint 1n
   | Tagged_immediate i ->
     C.cint
@@ -63,8 +63,10 @@ let rec static_float_array_updates symb env res acc i = function
 
 let static_boxed_number ~kind ~env ~symbol ~default ~emit ~transl ~structured v
     res updates =
-  let symbol = R.symbol res symbol in
-  let aux x cont = emit symbol (transl x) cont in
+  let aux x cont =
+    emit (R.symbol ~site:Declaration res symbol) (transl x) cont
+  in
+  let symbol = R.symbol ~site:Use_site res symbol in
   let env, res, updates =
     match (v : _ Or_variable.t) with
     | Const c ->
@@ -106,7 +108,6 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
     (static_const : Static_const.t) =
   match bound_static, static_const with
   | Block_like s, Block (tag, _mut, fields) ->
-    let sym = R.symbol res s in
     let res = R.check_for_module_symbol res s in
     let tag = Tag.Scannable.to_int tag in
     let header = C.black_block_header tag (List.length fields) in
@@ -117,8 +118,14 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
           static_field :: static_fields)
         fields []
     in
-    let block = C.emit_block sym header static_fields in
-    let env, res, updates = static_block_updates sym env res updates 0 fields in
+    let block =
+      C.emit_block (R.symbol ~site:Declaration res s) header static_fields
+    in
+    let env, res, updates =
+      static_block_updates
+        (R.symbol ~site:Use_site res s)
+        env res updates 0 fields
+    in
     env, R.set_data res block, updates
   | Set_of_closures closure_symbols, Set_of_closures set_of_closures ->
     let res, updates, env =
@@ -165,12 +172,18 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
         ~f:Numeric_types.Float_by_bit_pattern.to_float
     in
     let static_fields = List.map aux fields in
-    let sym = R.symbol res s in
-    let float_array = C.emit_float_array_constant sym static_fields in
-    let env, res, e = static_float_array_updates sym env res updates 0 fields in
+    let float_array =
+      C.emit_float_array_constant
+        (R.symbol ~site:Declaration res s)
+        static_fields
+    in
+    let env, res, e =
+      static_float_array_updates
+        (R.symbol ~site:Use_site res s)
+        env res updates 0 fields
+    in
     env, R.update_data res float_array, e
   | Block_like s, Immutable_value_array fields ->
-    let sym = R.symbol res s in
     let header = C.black_block_header 0 (List.length fields) in
     let static_fields =
       List.fold_right
@@ -179,18 +192,24 @@ let static_const0 env res ~updates (bound_static : Bound_static.Pattern.t)
           static_field :: static_fields)
         fields []
     in
-    let block = C.emit_block sym header static_fields in
-    let env, res, updates = static_block_updates sym env res updates 0 fields in
+    let block =
+      C.emit_block (R.symbol ~site:Declaration res s) header static_fields
+    in
+    let env, res, updates =
+      static_block_updates
+        (R.symbol ~site:Use_site res s)
+        env res updates 0 fields
+    in
     env, R.set_data res block, updates
   | Block_like s, Empty_array ->
     (* Recall: empty arrays have tag zero, even if their kind is naked float. *)
-    let sym = R.symbol res s in
+    let sym = R.symbol ~site:Declaration res s in
     let header = C.black_block_header 0 0 in
     let block = C.emit_block sym header [] in
     env, R.set_data res block, updates
   | Block_like s, Mutable_string { initial_value = str }
   | Block_like s, Immutable_string str ->
-    let data = C.emit_string_constant (R.symbol res s) str in
+    let data = C.emit_string_constant (R.symbol ~site:Declaration res s) str in
     env, R.update_data res data, updates
   | Block_like _, Set_of_closures _ ->
     Misc.fatal_errorf

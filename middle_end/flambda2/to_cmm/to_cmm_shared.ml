@@ -94,7 +94,7 @@ let name0 ?consider_inlining_effectful_expressions env res name =
       To_cmm_env.inline_variable ?consider_inlining_effectful_expressions env
         res v)
     ~symbol:(fun s ->
-      let sym = To_cmm_result.symbol res s in
+      let sym = To_cmm_result.symbol ~site:Use_site res s in
       (* CR mshinwell: fix debuginfo? *)
       To_cmm_env.
         { env;
@@ -136,7 +136,8 @@ let simple ?consider_inlining_effectful_expressions ~dbg env res s =
 let name_static res name =
   Name.pattern_match name
     ~var:(fun v -> `Var v)
-    ~symbol:(fun s -> `Data [symbol_address (To_cmm_result.symbol res s)])
+    ~symbol:(fun s ->
+      `Data [symbol_address (To_cmm_result.symbol ~site:Use_site res s)])
 
 let const_static cst =
   match Reg_width_const.descr cst with
@@ -197,7 +198,7 @@ let invalid res ~message =
       in
       let res =
         Cmm_helpers.emit_string_constant
-          (To_cmm_result.symbol res message_sym)
+          (To_cmm_result.symbol ~site:Declaration res message_sym)
           message []
         |> To_cmm_result.add_archive_data_items res
       in
@@ -210,7 +211,7 @@ let invalid res ~message =
   let call_expr =
     extcall ~dbg ~alloc:false ~is_c_builtin:false ~returns:false ~ty_args:[XInt]
       "caml_flambda2_invalid" Cmm.typ_void
-      [symbol ~dbg (To_cmm_result.symbol res message_sym)]
+      [symbol ~dbg (To_cmm_result.symbol ~site:Use_site res message_sym)]
   in
   call_expr, res
 

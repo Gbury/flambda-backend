@@ -44,6 +44,10 @@ let create ~module_symbol ~reachable_names =
 
    These functions are there to ensure that a given symbol is: 1) given an
    appropriate locality, and 2) **always** given the same locality *)
+type site =
+  | Use_site
+  | Declaration
+
 let equal_global g g' =
   match (g, g' : Cmm.is_global * Cmm.is_global) with
   | Local, Local | Global, Global -> true
@@ -62,24 +66,40 @@ let raw_symbol res ~global:sym_global sym_name : t * Cmm.symbol =
       Misc.fatal_errorf "The symbol %s is declared as both local and global"
         sym_name
 
-let symbol res sym =
+let symbol res ~site sym =
   let sym_name = Linkage_name.to_string (Symbol.linkage_name sym) in
   let sym_global =
-    if Compilation_unit.is_current (Symbol.compilation_unit sym)
-       && not (Name_occurrences.mem_symbol res.reachable_names sym)
-    then Cmm.Local
-    else Cmm.Global
+    match site with
+    | Use_site ->
+      (* Symbols, even if declared as Global, can be use as Local if declared in
+         the same compilation unit (see comment about is_global in cmm.ml) *)
+      if Compilation_unit.is_current (Symbol.compilation_unit sym)
+      then Cmm.Local
+      else Cmm.Global
+    | Declaration ->
+      if Compilation_unit.is_current (Symbol.compilation_unit sym)
+         && not (Name_occurrences.mem_symbol res.reachable_names sym)
+      then Cmm.Local
+      else Cmm.Global
   in
   let s : Cmm.symbol = { sym_name; sym_global } in
   s
 
-let symbol_of_code_id res code_id : Cmm.symbol =
+let symbol_of_code_id res ~site code_id : Cmm.symbol =
   let sym_name = Linkage_name.to_string (Code_id.linkage_name code_id) in
   let sym_global =
-    if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
-       && not (Name_occurrences.mem_code_id res.reachable_names code_id)
-    then Cmm.Local
-    else Cmm.Global
+    match site with
+    | Use_site ->
+      (* Symbols, even if declared as Global, can be use as Local if declared in
+         the same compilation unit (see comment about is_global in cmm.ml) *)
+      if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
+      then Cmm.Local
+      else Cmm.Global
+    | Declaration ->
+      if Compilation_unit.is_current (Code_id.get_compilation_unit code_id)
+         && not (Name_occurrences.mem_code_id res.reachable_names code_id)
+      then Cmm.Local
+      else Cmm.Global
   in
   { sym_name; sym_global }
 
@@ -177,6 +197,6 @@ let to_cmm r =
   in
   let function_phrases = List.map (fun f -> C.cfunction f) sorted_functions in
   (* Translate roots to Cmm symbols *)
-  let roots = List.map (symbol r) r.gc_roots in
+  let roots = List.map (symbol ~site:Use_site r) r.gc_roots in
   (* Return the data list, gc roots and function declarations *)
   { data_items = r.data_list; gc_roots = roots; functions = function_phrases }

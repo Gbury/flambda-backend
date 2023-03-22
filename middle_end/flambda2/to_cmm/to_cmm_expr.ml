@@ -110,7 +110,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       then args @ [callee]
       else args
     in
-    let code_sym = To_cmm_result.symbol_of_code_id res code_id in
+    let code_sym = To_cmm_result.symbol_of_code_id ~site:Use_site res code_id in
     match Apply.probe_name apply with
     | None ->
       ( C.direct_call ~dbg return_ty pos (C.symbol ~dbg code_sym) args,
@@ -157,7 +157,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     fail_if_probe apply;
     let callee =
       match Simple.must_be_symbol callee_simple with
-      | Some (sym, _) -> (To_cmm_result.symbol res sym).sym_name
+      | Some (sym, _) -> (To_cmm_result.symbol ~site:Use_site res sym).sym_name
       | None ->
         Misc.fatal_errorf "Expected a function symbol instead of:@ %a"
           Simple.print callee_simple

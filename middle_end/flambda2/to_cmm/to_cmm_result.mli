@@ -26,11 +26,16 @@ type t
 (** Create a result structure. *)
 val create : module_symbol:Symbol.t -> reachable_names:Name_occurrences.t -> t
 
-(** Create a cmm symbol *)
-val symbol : t -> Symbol.t -> Cmm.symbol
+(* The sites of a symbol *)
+type site =
+  | Use_site
+  | Declaration
 
-(** TODO *)
-val symbol_of_code_id : t -> Code_id.t -> Cmm.symbol
+(** Create a cmm symbol *)
+val symbol : t -> site:site -> Symbol.t -> Cmm.symbol
+
+(** Cmm symbol from a code id *)
+val symbol_of_code_id : t -> site:site -> Code_id.t -> Cmm.symbol
 
 (** Create a new symbol *)
 val raw_symbol : t -> global:Cmm.is_global -> string -> t * Cmm.symbol

@@ -169,7 +169,7 @@ end = struct
         updates )
     | Function_slot { size; function_slot; last_function_slot } -> (
       let code_id = Function_slot.Map.find function_slot decls in
-      let code_symbol = R.symbol_of_code_id res code_id in
+      let code_symbol = R.symbol_of_code_id ~site:Use_site res code_id in
       let (kind, params_ty, result_ty), closure_code_pointers, dbg =
         get_func_decl_params_arity env code_id
       in
@@ -184,7 +184,9 @@ end = struct
           let function_symbol =
             Function_slot.Map.find function_slot closure_symbols
           in
-          List.rev_append (P.define_symbol (R.symbol res function_symbol)) acc
+          List.rev_append
+            (P.define_symbol (R.symbol ~site:Declaration res function_symbol))
+            acc
       in
       (* We build here the **reverse** list of fields for the function slot *)
       match closure_code_pointers with
@@ -366,7 +368,7 @@ let params_and_body0 env res code_id ~fun_dbg ~check ~return_continuation
     @
     if Flambda_features.optimize_for_speed () then [] else [Cmm.Reduce_code_size]
   in
-  let fun_sym = R.symbol_of_code_id res code_id in
+  let fun_sym = R.symbol_of_code_id ~site:Declaration res code_id in
   let fun_poll =
     Env.get_code_metadata env code_id
     |> Code_metadata.poll_attribute |> Poll_attribute.to_lambda
@@ -441,7 +443,8 @@ let let_static_set_of_closures0 env res closure_symbols
     with
     | Some (function_slot_offset, function_slot) -> (
       match Function_slot.Map.find function_slot closure_symbols with
-      | closure_symbol -> function_slot_offset, R.symbol res closure_symbol
+      | closure_symbol ->
+        function_slot_offset, R.symbol ~site:Use_site res closure_symbol
       | exception Not_found ->
         Misc.fatal_errorf "No closure symbol for function slot %a"
           Function_slot.print function_slot)
@@ -530,7 +533,8 @@ let lift_set_of_closures env res ~body ~bound_vars layout set ~translate_expr
         let v = Bound_var.var v in
         let sym =
           C.symbol ~dbg
-            (R.symbol res (Function_slot.Map.find cid closure_symbols))
+            (R.symbol ~site:Use_site res
+               (Function_slot.Map.find cid closure_symbols))
         in
         Env.bind_variable env res v ~defining_expr:sym
           ~free_vars_of_defining_expr:Backend_var.Set.empty
