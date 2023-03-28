@@ -119,7 +119,7 @@ module Inlining = struct
     | Round of int
     | Default of Flambda_backend_flags.opt_level
 
-  let depth_scaling_factor = 10 (* See [Downwards_env.enter_inlined_apply] *)
+  let depth_scaling_factor = 1 (* See [Downwards_env.enter_inlined_apply] *)
 
   let default_for_opt_level (opt_level : Flambda_backend_flags.opt_level) =
     match opt_level with

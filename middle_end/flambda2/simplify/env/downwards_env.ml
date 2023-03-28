@@ -518,7 +518,7 @@ let enter_inlined_apply ~called_code ~apply ~was_inline_always t =
       else
         let by =
           if was_inline_always
-          then 1
+          then 3
           else Flambda_features.Inlining.depth_scaling_factor
         in
         Inlining_state.increment_depth t.inlining_state ~by)

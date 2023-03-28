@@ -62,8 +62,10 @@ let add_set_of_closures_offsets ~is_phantom named uacc =
       let from_function =
         try Code_id.Map.find code_id (DA.slot_offsets dacc)
         with Not_found ->
-          Misc.fatal_errorf "Missing offsets for code ID %a" Code_id.print
-            code_id
+          Format.eprintf "Missing offsets for code ID %a in named:@ %a"
+            Code_id.print code_id Named.print named;
+          at_exit (fun () -> Misc.fatal_errorf "bad offsets");
+          Slot_offsets.empty
       in
       let slot_offsets =
         Slot_offsets.add_offsets_from_function slot_offsets ~from_function
