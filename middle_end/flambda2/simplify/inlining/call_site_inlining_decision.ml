@@ -253,4 +253,12 @@ let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
                  handled. *)
               Begin_unrolling unroll_to
             else Unrolling_depth_exceeded
-          | Always_inlined | Hint_inlined -> Attribute_always))
+          | Always_inlined | Hint_inlined ->
+            (* Avoid infinite loops if a recursive call is marked [@inlined]
+               instead of [@unrolled]. *)
+            begin match Code_metadata.recursive
+                          (Code_or_metadata.code_metadata code_or_metadata) with
+            | Recursive -> Begin_unrolling 1
+            | Non_recursive -> Attribute_always
+            end
+      ))
