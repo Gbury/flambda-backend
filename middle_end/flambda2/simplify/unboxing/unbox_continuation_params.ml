@@ -154,6 +154,10 @@ let make_decisions ~continuation_arg_types denv params params_types :
 let compute_extra_params_and_args
     ({ decisions; rewrite_ids_seen; rewrites_ids_known_as_invalid } :
       Decisions.t) ~arg_types_by_use_id existing_extra_params_and_args =
+  if debug ()
+  then
+    Format.eprintf "@.*** Compute Unboxing EPA ***@\nprevious epa: %a@."
+      EPA.print existing_extra_params_and_args;
   let _, extra_params_and_args, _ =
     List.fold_left2
       (fun (nth, extra_params_and_args, invalids) arg_type_by_use_id
@@ -164,6 +168,15 @@ let compute_extra_params_and_args
             ~rewrites_ids_known_as_invalid:invalids nth arg_type_by_use_id
             decision
         in
+        if debug ()
+        then
+          Format.eprintf
+            "+++ %d-nth param@\narg_types: %a@\ninvalids: %a@\ndecision: %a@."
+            nth
+            (Apply_cont_rewrite_id.Map.print
+               Continuation_uses.print_arg_type_at_use)
+            arg_type_by_use_id Apply_cont_rewrite_id.Set.print invalids
+            U.print_decision decision;
         let extra_params_and_args =
           Unboxing_epa.add_extra_params_and_args extra_params_and_args ~invalids
             decision

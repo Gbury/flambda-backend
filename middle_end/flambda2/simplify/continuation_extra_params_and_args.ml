@@ -104,10 +104,11 @@ let add t ~invalids ~extra_param ~extra_args =
                (%a) for:\n\
                new param: %a\n\
                new args: %a\n\
+               new invalids: %a\n\
                existing epa: %a" Apply_cont_rewrite_id.print id
               Bound_parameter.print extra_param
               (Apply_cont_rewrite_id.Map.print Extra_arg.print)
-              extra_args print t
+              extra_args Apply_cont_rewrite_id.Set.print invalids print t
           | Some _, None ->
             if Apply_cont_rewrite_id.Set.mem id invalids
             then Some Or_invalid.Invalid
@@ -117,10 +118,11 @@ let add t ~invalids ~extra_param ~extra_args =
                  missing for:\n\
                  new param: %a\n\
                  new args: %a\n\
+                 new invalids: %a\n\
                  existing epa: %a" Apply_cont_rewrite_id.print id
                 Bound_parameter.print extra_param
                 (Apply_cont_rewrite_id.Map.print Extra_arg.print)
-                extra_args print t
+                extra_args Apply_cont_rewrite_id.Set.print invalids print t
           | Some Or_invalid.Invalid, Some _ -> Some Or_invalid.Invalid
           | Some (Or_invalid.Ok already_extra_args), Some extra_arg ->
             Some (Or_invalid.Ok (extra_arg :: already_extra_args)))
