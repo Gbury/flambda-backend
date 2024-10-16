@@ -968,6 +968,18 @@ let sort_handlers data handlers =
       group :: inner)
     [] sorted_handlers_from_the_inside_to_the_outside
 
+let specialize_continuation ~simplify_expr:_ ~denv_for_join:_ dacc
+    (data : after_downwards_traversal_of_body_and_handlers_data)
+    k (_handler : handler_after_downwards_traversal) =
+  match CUE.get_continuation_uses data.cont_uses_env k with
+  | None -> dacc, data
+  | Some uses ->
+    begin match Continuation_uses.get_uses uses with
+      | [] | [_] -> dacc, data
+      | _ :: _ :: _ as uses ->
+        dacc, data
+    end
+
 (* CR pchambart: Those functions don't need to be recursive, it would be nice to
    fix that later *)
 let rec after_downwards_traversal_of_body_and_handlers ~simplify_expr
@@ -980,6 +992,14 @@ let rec after_downwards_traversal_of_body_and_handlers ~simplify_expr
     ( dacc,
       down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
         lifted_conts ~down_to_up )
+  in
+  (* Time to Specialize !! *)
+  let dacc, data =
+    match Continuation.Map.get_singleton data.handlers with
+    | Some (k, handler)
+      when Continuation.Set.mem k (DA.continuations_to_specialize dacc) ->
+      specialize_continuation ~simplify_expr ~denv_for_join dacc data k handler
+    | _ -> dacc, data
   in
   (* Here, we want to actually rebuild the let-cont, so we need to call the
      global [down_to_up] function. First however, we have to take care of

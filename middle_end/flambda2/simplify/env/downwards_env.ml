@@ -609,15 +609,15 @@ let add_lifting_cost cost t =
     }
 
 let denv_for_lifted_continuation ~denv_for_join ~denv =
-  (* At this point, we are lifting a continuation k' with handler [handlers],
+  (* At this point, we are lifting a continuation k' with handler [handler],
      out of a continuation k, and:
 
      - [denv_for_join] is the denv just before the let_cont for k
 
      - [denv] is the denv just before the let_cont for k'
 
-     And we need to decide which parts of denv to use to simplify the handlers
-     of k' after there are lifted out from the handler of k. *)
+     And we need to decide which parts of denv to use to simplify the handler
+     of k' after they are lifted out from the handler of k. *)
   { (* denv *)
     inlined_debuginfo = denv.inlined_debuginfo;
     can_inline = denv.can_inline;

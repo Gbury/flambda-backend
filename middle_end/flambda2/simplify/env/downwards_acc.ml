@@ -35,7 +35,9 @@ type t =
     are_lifting_conts : Are_lifting_conts.t;
     lifted_continuations : (DE.t * Original_handlers.t) list;
     (* head of the list is the innermost continuation being lifted *)
-    continuation_lifting_budget : int
+    continuation_lifting_budget : int;
+    continuations_to_specialize : Continuation.Set.t;
+    specialization_map : Continuation.t Apply_cont_rewrite_id.Map.t Continuation.Map.t;
   }
 
 let print_lifted_cont ppf (denv, original_handlers) =
@@ -47,7 +49,8 @@ let [@ocamlformat "disable"] print ppf
       { denv; continuation_uses_env; shareable_constants; used_value_slots;
         lifted_constants; flow_acc; demoted_exn_handlers; code_ids_to_remember;
         code_ids_to_never_delete; code_ids_never_simplified; slot_offsets; debuginfo_rewrites;
-        are_lifting_conts; lifted_continuations; continuation_lifting_budget; } =
+        are_lifting_conts; lifted_continuations; continuation_lifting_budget;
+        continuations_to_specialize; specialization_map; } =
   Format.fprintf ppf "@[<hov 1>(\
       @[<hov 1>(denv@ %a)@]@ \
       @[<hov 1>(continuation_uses_env@ %a)@]@ \
@@ -63,7 +66,9 @@ let [@ocamlformat "disable"] print ppf
       @[<hov 1>(debuginfo_rewrites@ %a)@]@ \
       @[<hov 1>(are_lifting_conts@ %a)@]@ \
       @[<hov 1>(lifted_continuations@ %a)@]@ \
-      @[<hov 1>(continuation_lifting_budget %d)@]\
+      @[<hov 1>(continuation_lifting_budget %d)@]@ \
+      @[<hov 1>(continuations_to_specialize %a)@]@ \
+      @[<hov 1>(specialization_map %a)@]\
       )@]"
     DE.print denv
     CUE.print continuation_uses_env
@@ -81,6 +86,8 @@ let [@ocamlformat "disable"] print ppf
     (Format.pp_print_list ~pp_sep:Format.pp_print_space
        print_lifted_cont) lifted_continuations
     continuation_lifting_budget
+    Continuation.Set.print continuations_to_specialize
+    (Continuation.Map.print (Apply_cont_rewrite_id.Map.print Continuation.print)) specialization_map
 
 let create denv slot_offsets continuation_uses_env =
   { denv;
@@ -97,7 +104,9 @@ let create denv slot_offsets continuation_uses_env =
     debuginfo_rewrites = Simple.Map.empty;
     are_lifting_conts = Are_lifting_conts.no_lifting;
     lifted_continuations = [];
-    continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ()
+    continuation_lifting_budget = Flambda_features.Expert.cont_lifting_budget ();
+    continuations_to_specialize = Continuation.Set.empty;
+    specialization_map = Continuation.Map.empty;
   }
 
 let denv t = t.denv
@@ -298,3 +307,21 @@ let prepare_for_speculative_inlining dacc =
     map_denv ~f:DE.set_do_not_rebuild_terms_and_disable_inlining dacc
   in
   with_are_lifting_conts dacc Are_lifting_conts.no_lifting
+
+let continuations_to_specialize t = t.continuations_to_specialize
+
+let add_continuation_to_specialize t cont =
+  { t with continuations_to_specialize = Continuation.Set.add cont t.continuations_to_specialize; }
+
+let add_specialization t id ~old ~specialized =
+  let specialization_map =
+    Continuation.Map.update old (fun rewrite_id_map ->
+        let rewrite_map = Option.value rewrite_id_map ~default:Apply_cont_rewrite_id.Map.empty in
+        Some (Apply_cont_rewrite_id.Map.update id (function
+            | None -> Some specialized
+            | Some _ ->
+              Misc.fatal_errorf "This call was already specialized !!"
+          ) rewrite_map)) t.specialization_map
+  in
+  { t with specialization_map; }
+

@@ -615,13 +615,17 @@ let simplify_switch0 dacc switch ~down_to_up =
       let cost = DE.cost_of_lifting_continuations_out_of_current_one denv in
       if budget = 0 || budget < cost
       then dacc
-      else
+      else begin
         (* TODO/FIXME: implement an actual criterion for when to lift
-           continuations. Currently for testing, we lift any continuation that
-           occurs in a handler that ends with a switch. *)
-        DA.with_are_lifting_conts
-          (DA.decrease_continuation_lifting_budget dacc cost)
-          (Are_lifting_conts.lift_continuations_out_of continuation)
+           continuations and specialize them. Currently for testing,
+           we lift any continuation that occurs in a handler that ends
+           with a switch (if the bduget allows), and we specialize the
+           continuation that ends with the switch. *)
+        let dacc = DA.decrease_continuation_lifting_budget dacc cost in
+        let dacc = DA.with_are_lifting_conts dacc (Are_lifting_conts.lift_continuations_out_of continuation) in
+        let dacc = DA.add_continuation_to_specialize dacc continuation in
+        dacc
+      end
   in
   down_to_up dacc
     ~rebuild:
