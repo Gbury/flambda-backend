@@ -36,8 +36,8 @@ type t =
     lifted_continuations : (DE.t * Original_handlers.t) list;
     (* head of the list is the innermost continuation being lifted *)
     continuation_lifting_budget : int;
-    continuations_to_specialize : Continuation.Set.t;
-    specialization_map : Continuation.t Apply_cont_rewrite_id.Map.t Continuation.Map.t;
+    continuations_to_specialize : Continuation.Set.t; (* TODO* encode that into the map below as the keys of the map *)
+    specialization_map : Continuation.t Continuation_callsite_map.t;
   }
 
 let print_lifted_cont ppf (denv, original_handlers) =
@@ -314,14 +314,8 @@ let add_continuation_to_specialize t cont =
   { t with continuations_to_specialize = Continuation.Set.add cont t.continuations_to_specialize; }
 
 let add_specialization t id ~old ~specialized =
-  let specialization_map =
-    Continuation.Map.update old (fun rewrite_id_map ->
-        let rewrite_map = Option.value rewrite_id_map ~default:Apply_cont_rewrite_id.Map.empty in
-        Some (Apply_cont_rewrite_id.Map.update id (function
-            | None -> Some specialized
-            | Some _ ->
-              Misc.fatal_errorf "This call was already specialized !!"
-          ) rewrite_map)) t.specialization_map
-  in
+  let specialization_map = Continuation_callsite_map.add old id specialized t.specialization_map in
   { t with specialization_map; }
+
+let specialization_map t = t.specialization_map
 

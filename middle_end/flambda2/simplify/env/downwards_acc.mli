@@ -140,6 +140,8 @@ val continuations_to_specialize : t -> Continuation.Set.t
 
 val add_continuation_to_specialize : t -> Continuation.t -> t
 
+val specialization_map : t -> Continuation.t Apply_cont_rewrite_id.Map.t Continuation.Map.t
+
 val add_specialization :
   t -> Apply_cont_rewrite_id.t -> old:Continuation.t -> specialized:Continuation.t -> t
 

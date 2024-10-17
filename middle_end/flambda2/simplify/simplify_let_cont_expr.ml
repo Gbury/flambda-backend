@@ -972,7 +972,7 @@ let specialize_continuation ~simplify_expr:_ ~denv_for_join:_ dacc
     (data : after_downwards_traversal_of_body_and_handlers_data)
     k (_handler : handler_after_downwards_traversal) =
   match CUE.get_continuation_uses data.cont_uses_env k with
-  | None -> dacc, data
+  | None -> (* TODO: fatal error ? *) dacc, data
   | Some uses ->
     begin match Continuation_uses.get_uses uses with
       | [] | [_] -> dacc, data

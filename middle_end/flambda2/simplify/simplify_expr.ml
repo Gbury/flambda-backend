@@ -60,6 +60,7 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
           Flow.Analysis.analyze data_flow ~print_name ~code_age_relation
             ~used_value_slots
             ~code_ids_to_never_delete:(DA.code_ids_to_never_delete dacc)
+            ~specialization_map:(DA.specialization_map dacc)
             ~return_continuation ~exn_continuation
         in
         let uenv =
@@ -72,7 +73,8 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
             (Flambda_arity.create_singletons [K.With_subkind.any_value])
         in
         let uacc =
-          UA.create ~flow_result ~compute_slot_offsets:true uenv dacc
+          UA.create ~flow_result ~compute_slot_offsets:true
+            uenv dacc
         in
         let uacc =
           if Flow.Analysis.did_perform_mutable_unboxing flow_result
