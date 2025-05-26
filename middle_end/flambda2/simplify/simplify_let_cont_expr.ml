@@ -1069,24 +1069,19 @@ let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
     let lifted_params = original.lifted_params in
     let is_exn_handler = original.is_exn_handler in
     let denv = data.after_downwards_traversal_of_body.denv_for_join in
-    (* TODO: set DE.at_unit_toplevel false ? -> or rather assert it ? *)
-    (* TODO: refactor some function in CUE and Continuation_uses to take a
-       [One_continuation_use.t] as argument *)
-    let uses =
-      Continuation_uses.add_use
-        (Continuation_uses.create cont (Bound_parameters.arity params))
-        (One_continuation_use.use_kind use)
-        ~env_at_use:(One_continuation_use.env_at_use use)
-        (One_continuation_use.id use)
-        ~arg_types:(One_continuation_use.arg_types use)
+    let arg_types_by_use_id =
+      let uses =
+        Continuation_uses.create cont (Bound_parameters.arity params)
+      in
+      let uses = Continuation_uses.add_use uses use in
+      Continuation_uses.get_arg_types_by_use_id uses
     in
     let dacc, unbox_decisions, is_exn_handler, extra_params_and_args =
       prepare_dacc_for_handlers dacc ~env_at_fork:denv ~params ~replay
         ~lifted_params ~consts_lifted_after_fork:data.consts_lifted_after_fork
         ~is_recursive (Continuation.sort cont)
         (if is_exn_handler then Some cont else None)
-        [use]
-        ~arg_types_by_use_id:(Continuation_uses.get_arg_types_by_use_id uses)
+        [use] ~arg_types_by_use_id
     in
     (* Set the adequate state for lifting. Note that this must be done **after**
        the call to {prepare_dacc_for_handlers} as that function can sometimes
