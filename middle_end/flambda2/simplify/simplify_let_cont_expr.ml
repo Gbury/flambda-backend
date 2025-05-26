@@ -1054,6 +1054,8 @@ let sort_handlers data handlers =
       group :: inner)
     [] sorted_handlers_from_the_inside_to_the_outside
 
+(* CR pchambart/gbury: All of those functions don't need to be recursive, it
+   would be nice to split some of them out (e.g. prepare_dacc_for_handlers). *)
 let rec compute_specialized_continuation ~replay ~simplify_expr ~original_cont
     ~(handler : handler_after_downwards_traversal) dacc data use k =
   let cont = Continuation.rename original_cont in
@@ -1189,8 +1191,8 @@ and specialize_continuation_if_needed ~simplify_expr dacc
         let dacc =
           DA.with_continuation_specialization_budget dacc spec_budget
         in
-        (* We need to adjust the contination uses env with a few things: TODO:
-           continue this comment *)
+        (* Remove the (generic) continuation uses from the CUE, since we will
+           then add uses for each of the specialized continuation. *)
         let cont_uses_env = CUE.remove data.cont_uses_env_after_body cont in
         let data =
           { data with
@@ -1203,8 +1205,6 @@ and specialize_continuation_if_needed ~simplify_expr dacc
           ~original_cont:cont ~handler dacc data uses k))
   | _ -> k dacc data
 
-(* CR pchambart: Those functions don't need to be recursive, it would be nice to
-   fix that later *)
 and after_downwards_traversal_of_body_and_handlers ~simplify_expr ~denv_for_join
     (data : after_downwards_traversal_of_body_and_handlers_data) ~down_to_up
     dacc =
@@ -1734,7 +1734,6 @@ and down_to_up_for_lifted_continuations ~simplify_expr ~denv_for_join
     let data : after_downwards_traversal_of_body_data =
       { denv_for_join = actual_denv;
         prior_lifted_constants = LCS.empty;
-        (* TODO: is this correct ? *)
         handlers
       }
     in
