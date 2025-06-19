@@ -642,7 +642,46 @@ let simplify_switch0 dacc switch ~down_to_up =
           (* CR gbury: we could try and emit something analog to the inlining
              report, but for other optimizations at one point ? *)
           dacc
-        | Can_specialize { size_of_primitives = _ } ->
+        | Can_specialize { size_of_primitives; } ->
+
+          (* Estimate the cost of lifting: this mainly comes from adding new
+             parameters, which increase the work done by the typing env, as well
+             as the flow analysis. We then only do the lifting if the cost is
+             within the budget for the current function. *)
+          let lifting_budget = DA.get_continuation_lifting_budget dacc in
+          let lifting_cost =
+            DE.cost_of_lifting_continuations_out_of_current_one denv
+          in
+          let is_lifting_allowed_by_budget =
+            lifting_budget > 0 && lifting_cost <= lifting_budget
+          in
+          (* Specialization budget: we use the size of duplicated primitives
+             from the specialization cost as an estimate of the increase in code
+             size (and a not so good approximation of the additional compilation
+             work done).
+
+             CR gbury/bclement: currently the size of primtives do not include
+             some primitives that we expect to be simplified away (e.g.
+             Tag_immediate and Get_tag) and thus we often times expect
+             [size_of_primitives] to be 0. We should/could try to use info from
+             the typing env to know which primitives will have their result
+             determined by the values that are known at call_site (and thus will
+             disappear from the specialized versions). *)
+          let specialization_budget =
+            DA.get_continuation_specialization_budget dacc
+          in
+          let specialization_cost =
+            n_uses * size_of_primitives
+            (* specializing requires 'n_uses + 1' traversals of the continuation
+               handler *)
+          in
+          let is_specialization_allowed_by_budget =
+            specialization_budget > 0
+            && specialization_cost <= specialization_budget
+          in
+          (* Last criterion: whether all callsites of the continuation determine
+             the value of the scrutinee (and therefore the specialized versions
+             will eliminate the switch in favor of an apply_cont directly). *)
           let join_info =
             match DA.get_join_id_for_continuation dacc continuation with
             | Some join_id -> DE.get_join_info denv join_id
@@ -682,40 +721,25 @@ let simplify_switch0 dacc switch ~down_to_up =
                   | Known _ -> false)
                 ~const:(fun _ -> true)
           in
-          (* Estimate the cost of lifting: this mainly comes from adding new
-             parameters, which increase the work done by the typing env, as well
-             as the flow analysis. We then only do the lifting if the cost is
-             within the budget for the current function. *)
-          let lifting_budget = DA.get_continuation_lifting_budget dacc in
-          let lifting_cost =
-            DE.cost_of_lifting_continuations_out_of_current_one denv
+          if debug ()
+          then
+            Format.eprintf
+              "*** SPEC decision %a@\n\
+               scrutinee_known_in_all_uses: %b@\n\
+               is_lifting_allowed_by_budget: %b@\n\
+               is_specialization_allowed_by_budget: %b@." Continuation.print
+              continuation is_known_at_all_uses
+              is_lifting_allowed_by_budget is_specialization_allowed_by_budget;
+          (* CR gbury: only compute [scrutinee_known_in_all_uses] if the budget
+             allows lifting (for better performances). *)
+          let choose_to_specialize =
+            is_known_at_all_uses
+            && is_lifting_allowed_by_budget
+            && is_specialization_allowed_by_budget
           in
-          let is_lifting_allowed_by_budget =
-            lifting_budget > 0 && lifting_cost <= lifting_budget
-          in
-          (* very basic specialization budget *)
-          let specialization_budget =
-            DA.get_continuation_specialization_budget dacc
-          in
-          let specialization_cost =
-            n_uses + 1
-            (* specializing requires 'n_uses + 1' traversals of the continuation
-               handler *)
-          in
-          let is_specialization_allowed_by_budget =
-            specialization_budget > 0
-            && specialization_cost <= specialization_budget
-          in
-          if (not is_known_at_all_uses)
-             && ((not is_lifting_allowed_by_budget)
-                || not is_specialization_allowed_by_budget)
+          if not choose_to_specialize
           then dacc
           else
-            (* TODO/FIXME: implement an actual criterion for when to lift
-               continuations and specialize them. Currently for testing, we lift
-               any continuation that occurs in a handler that ends with a switch
-               (if the bduget for lifting and specialization allows it), and we
-               specialize the continuation that ends with the switch. *)
             let dacc =
               DA.decrease_continuation_lifting_budget dacc lifting_cost
             in

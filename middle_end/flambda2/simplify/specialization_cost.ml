@@ -59,9 +59,15 @@ let update_cost ~f = function
   | Cannot_specialize _ as res -> res
 
 let add_prim prim t =
-  let size = Code_size.to_int (Code_size.prim prim) in
-  update_cost t ~f:(fun { size_of_primitives = s } ->
-      { size_of_primitives = size + s })
+  match[@warning "-4"] (prim : Flambda_primitive.t) with
+  (* We "ignore" some primitive, as we expect these to not matter, and often
+     times to be simplified away by the specialization if they operate on the
+     value that is known. *)
+  | Unary (Tag_immediate, _) | Unary (Get_tag, _) -> t
+  | _ ->
+    let size = Code_size.to_int (Code_size.prim prim) in
+    update_cost t ~f:(fun { size_of_primitives = s } ->
+        { size_of_primitives = size + s })
 
 let add_set_of_closures _soc _t =
   Cannot_specialize { reason = Contains_set_of_closures }
