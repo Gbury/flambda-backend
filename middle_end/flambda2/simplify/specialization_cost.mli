@@ -84,6 +84,5 @@ val cost_metrics :
   join_info:Apply_cont_rewrite_id.t Flambda2_types.Join_info.t ->
   specialized:Apply_cont_rewrite_id.t list ->
   generic:Apply_cont_rewrite_id.t list ->
-  cost -> Cost_metrics.t
-
-
+  cost ->
+  Cost_metrics.t
