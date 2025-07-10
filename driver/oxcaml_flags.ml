@@ -228,7 +228,7 @@ module Flambda2 = struct
       let max_function_simplify_run = 2
       let shorten_symbol_names = false
       let cont_lifting_budget = 0
-      let cont_spec_budget = 0
+      let cont_spec_threshold = -1.
     end
 
     type flags = {
@@ -241,7 +241,7 @@ module Flambda2 = struct
       max_function_simplify_run : int;
       shorten_symbol_names : bool;
       cont_lifting_budget : int;
-      cont_spec_budget : int;
+      cont_spec_threshold : float;
     }
 
     let default = {
@@ -254,7 +254,7 @@ module Flambda2 = struct
       max_function_simplify_run = Default.max_function_simplify_run;
       shorten_symbol_names = Default.shorten_symbol_names;
       cont_lifting_budget = Default.cont_lifting_budget;
-      cont_spec_budget = Default.cont_spec_budget;
+      cont_spec_threshold = Default.cont_spec_threshold;
     }
 
     let oclassic = {
@@ -266,14 +266,14 @@ module Flambda2 = struct
     let o2 = {
       default with
       fallback_inlining_heuristic = false;
-      cont_lifting_budget = 0;
-      cont_spec_budget = 0;
+      cont_lifting_budget = 10_000;
+      cont_spec_threshold = 0.;
     }
 
     let o3 = {
       default with
-      cont_lifting_budget = 0;
-      cont_spec_budget = 0;
+      cont_lifting_budget = 100_000;
+      cont_spec_threshold = 50.;
     }
 
     let default_for_opt_level opt_level =
@@ -288,7 +288,7 @@ module Flambda2 = struct
     let max_function_simplify_run = ref Default
     let shorten_symbol_names = ref Default
     let cont_lifting_budget = ref Default
-    let cont_spec_budget = ref Default
+    let cont_spec_threshold = ref Default
   end
 
   module Debug = struct
